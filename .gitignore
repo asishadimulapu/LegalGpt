@@ -49,9 +49,6 @@ env/
 logs/
 *.log
 
-# FAISS index (large files)
-data/faiss_index/
-
 # OS files
 .DS_Store
 Thumbs.db
