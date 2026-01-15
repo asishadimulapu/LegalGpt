@@ -1,0 +1,43 @@
+# Fly.io Configuration for NyayaSahay Backend
+# Deploy with: fly launch --no-deploy && fly deploy
+
+app = "nyayasahay-api"
+primary_region = "bom"  # Mumbai, India
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  APP_ENV = "production"
+  DEBUG = "false"
+  LLM_PROVIDER = "groq"
+  EMBEDDING_PROVIDER = "huggingface"
+  FAISS_INDEX_PATH = "./data/faiss_index"
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+  # Longer timeout for cold starts (loading AI models)
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 20
+
+# Health check with longer timeout
+[[http_service.checks]]
+  grace_period = "120s"  # 2 minutes grace period for model loading
+  interval = "30s"
+  method = "GET"
+  path = "/health"
+  timeout = "60s"  # 60 second timeout per check
+
+# Machine configuration
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512  # Can increase if needed
