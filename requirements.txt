@@ -33,3 +33,6 @@ bcrypt>=4.1.2
 httpx>=0.26.0
 tenacity>=8.2.3
 PyMuPDF>=1.23.0
+
+# Embeddings - required for FAISS (built with all-MiniLM-L6-v2)
+sentence-transformers>=2.2.2
