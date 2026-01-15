@@ -9,12 +9,20 @@ from datetime import datetime
 from typing import Optional, List
 
 from sqlalchemy import (
-    Column, String, Text, Boolean, Integer, DateTime, 
+    Column, String, Text, Boolean, Integer, DateTime, Float,
     ForeignKey, Index, Enum as SQLEnum
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 import enum
+
+# pgvector support
+try:
+    from pgvector.sqlalchemy import Vector
+    PGVECTOR_AVAILABLE = True
+except ImportError:
+    PGVECTOR_AVAILABLE = False
+    Vector = None
 
 from app.db.database import Base
 
@@ -354,3 +362,82 @@ class ApplicationLog(Base):
     __table_args__ = (
         Index("idx_logs_level_created", "level", "created_at"),
     )
+
+
+# =============================================================================
+# Document Embedding Model (pgvector)
+# =============================================================================
+class DocumentEmbedding(Base):
+    """
+    Store document embeddings using pgvector for semantic search.
+    
+    Viva Explanation:
+    - Replaces FAISS file-based vector storage
+    - Uses PostgreSQL pgvector extension for similarity search
+    - 384 dimensions for all-MiniLM-L6-v2 embeddings
+    - Enables SQL-based vector operations (cosine similarity, L2 distance)
+    """
+    __tablename__ = "document_embeddings"
+    
+    id = Column(
+        UUID(as_uuid=True), 
+        primary_key=True, 
+        default=uuid.uuid4,
+        comment="Unique embedding identifier"
+    )
+    content = Column(
+        Text, 
+        nullable=False,
+        comment="Original document text chunk"
+    )
+    # Vector column for embeddings (384 dimensions for all-MiniLM-L6-v2)
+    # Using conditional column creation to handle missing pgvector
+    embedding = Column(
+        Vector(384) if PGVECTOR_AVAILABLE else Text,
+        nullable=False,
+        comment="384-dimensional embedding vector"
+    )
+    # Metadata from original documents
+    source = Column(
+        String(255), 
+        nullable=True,
+        index=True,
+        comment="Source document/act name"
+    )
+    section = Column(
+        String(255), 
+        nullable=True,
+        comment="Section number or reference"
+    )
+    title = Column(
+        String(500), 
+        nullable=True,
+        comment="Section or article title"
+    )
+    act_type = Column(
+        String(100), 
+        nullable=True,
+        index=True,
+        comment="Type of legal act (IPC, CrPC, Constitution, etc.)"
+    )
+    metadata = Column(
+        JSONB, 
+        nullable=True,
+        default=dict,
+        comment="Additional metadata from source"
+    )
+    created_at = Column(
+        DateTime, 
+        default=datetime.utcnow, 
+        nullable=False,
+        comment="Embedding creation timestamp"
+    )
+    
+    # Index for HNSW vector search (if pgvector supports it)
+    __table_args__ = (
+        Index("idx_embeddings_source", "source"),
+        Index("idx_embeddings_act_type", "act_type"),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<DocumentEmbedding(id={self.id}, source={self.source})>"

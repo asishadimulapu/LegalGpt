@@ -1,12 +1,11 @@
-# Indian Law RAG Chatbot - FAISS Vector Store
+# Indian Law RAG Chatbot - Vector Store Manager
 """
-FAISS vector store management for efficient similarity search.
+Unified vector store management supporting both FAISS and pgvector.
 
 Viva Explanation:
-- FAISS (Facebook AI Similarity Search) enables fast vector search
-- Supports billions of vectors with millisecond latency
-- Uses approximate nearest neighbor (ANN) algorithms
-- IndexFlatL2 uses exact L2 (Euclidean) distance for small datasets
+- pgvector: PostgreSQL-based, no files needed (preferred for deployment)
+- FAISS: File-based, faster for local development
+- Automatic fallback: Uses pgvector if available, else FAISS
 """
 
 import os
@@ -14,148 +13,101 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 import logging
 
-from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 
 from app.config import settings
-from app.core.embeddings import get_embedding_model
 
 logger = logging.getLogger(__name__)
+
+# Check if pgvector is available
+try:
+    from app.core.pgvector_store import pgvector_store, PgVectorStore
+    PGVECTOR_AVAILABLE = True
+except ImportError:
+    PGVECTOR_AVAILABLE = False
+    pgvector_store = None
 
 
 class VectorStoreManager:
     """
-    Manager class for FAISS vector store operations.
+    Unified manager for vector store operations.
     
     Viva Explanation:
-    - Handles creation, loading, and saving of FAISS index
-    - Provides similarity search interface
-    - Manages index persistence for production use
+    - Automatically chooses between pgvector and FAISS
+    - pgvector preferred for production (no file dependencies)
+    - FAISS used as fallback for local development
     """
     
-    def __init__(self, index_path: Optional[str] = None):
+    def __init__(self, index_path: Optional[str] = None, use_pgvector: bool = True):
         """
         Initialize the vector store manager.
         
         Args:
-            index_path: Path to store/load FAISS index
+            index_path: Path to FAISS index (fallback)
+            use_pgvector: Whether to prefer pgvector over FAISS
         """
         self.index_path = index_path or settings.faiss_index_path
-        self._vector_store: Optional[FAISS] = None
+        self._use_pgvector = use_pgvector and PGVECTOR_AVAILABLE
+        self._faiss_store = None
         self._embeddings = None
+        self._initialized = False
     
     @property
     def embeddings(self):
         """Lazy load embeddings model."""
         if self._embeddings is None:
+            from app.core.embeddings import get_embedding_model
             self._embeddings = get_embedding_model()
         return self._embeddings
     
-    @property
-    def vector_store(self) -> Optional[FAISS]:
-        """Get the loaded vector store."""
-        return self._vector_store
+    def _check_pgvector_data(self) -> bool:
+        """Check if pgvector has data."""
+        if not PGVECTOR_AVAILABLE:
+            return False
+        try:
+            count = pgvector_store.get_document_count()
+            return count > 0
+        except Exception as e:
+            logger.warning(f"Could not check pgvector: {e}")
+            return False
     
-    def create_from_documents(
-        self, 
-        documents: List[Document],
-        save: bool = True
-    ) -> FAISS:
-        """
-        Create a new FAISS index from documents.
-        
-        Args:
-            documents: List of LangChain Document objects
-            save: Whether to save the index to disk
-            
-        Returns:
-            FAISS: Created vector store
-            
-        Viva Explanation:
-        - Documents are converted to embeddings
-        - Embeddings are indexed for fast retrieval
-        - Metadata is preserved for citations
-        """
-        if not documents:
-            raise ValueError("No documents provided for indexing")
-        
-        logger.info(f"Creating FAISS index from {len(documents)} documents")
-        
-        # Create FAISS index
-        self._vector_store = FAISS.from_documents(
-            documents=documents,
-            embedding=self.embeddings
-        )
-        
-        logger.info("FAISS index created successfully")
-        
-        # Save to disk if requested
-        if save:
-            self.save()
-        
-        return self._vector_store
+    def _check_faiss_data(self) -> bool:
+        """Check if FAISS index exists."""
+        index_path = Path(self.index_path)
+        return index_path.exists() and (index_path / "index.faiss").exists()
     
-    def add_documents(self, documents: List[Document]) -> None:
+    def load(self) -> bool:
         """
-        Add new documents to existing index.
-        
-        Args:
-            documents: Documents to add
-        """
-        if self._vector_store is None:
-            raise ValueError("Vector store not initialized. Call create_from_documents or load first.")
-        
-        logger.info(f"Adding {len(documents)} documents to index")
-        self._vector_store.add_documents(documents)
-    
-    def load(self) -> FAISS:
-        """
-        Load FAISS index from disk.
+        Load the vector store (pgvector or FAISS).
         
         Returns:
-            FAISS: Loaded vector store
-            
-        Raises:
-            FileNotFoundError: If index doesn't exist
+            bool: True if loaded successfully
         """
-        index_path = Path(self.index_path)
+        # Try pgvector first
+        if self._use_pgvector and self._check_pgvector_data():
+            logger.info("Using pgvector store from PostgreSQL")
+            self._initialized = True
+            return True
         
-        if not index_path.exists():
-            raise FileNotFoundError(
-                f"FAISS index not found at {self.index_path}. "
-                "Run the data pipeline first to create the index."
-            )
+        # Fallback to FAISS
+        if self._check_faiss_data():
+            logger.info(f"Loading FAISS index from {self.index_path}")
+            try:
+                from langchain_community.vectorstores import FAISS
+                self._faiss_store = FAISS.load_local(
+                    folder_path=str(self.index_path),
+                    embeddings=self.embeddings,
+                    allow_dangerous_deserialization=True
+                )
+                self._initialized = True
+                logger.info("FAISS index loaded successfully")
+                return True
+            except Exception as e:
+                logger.error(f"Failed to load FAISS: {e}")
+                return False
         
-        logger.info(f"Loading FAISS index from {self.index_path}")
-        
-        self._vector_store = FAISS.load_local(
-            folder_path=str(index_path),
-            embeddings=self.embeddings,
-            allow_dangerous_deserialization=True  # Required for loading
-        )
-        
-        logger.info("FAISS index loaded successfully")
-        return self._vector_store
-    
-    def save(self) -> None:
-        """
-        Save FAISS index to disk.
-        
-        Viva Explanation:
-        - Persists index for production use
-        - Avoids re-embedding on restart
-        - Saves both index and metadata
-        """
-        if self._vector_store is None:
-            raise ValueError("No vector store to save")
-        
-        # Create directory if needed
-        index_path = Path(self.index_path)
-        index_path.mkdir(parents=True, exist_ok=True)
-        
-        logger.info(f"Saving FAISS index to {self.index_path}")
-        self._vector_store.save_local(str(index_path))
-        logger.info("FAISS index saved successfully")
+        logger.warning("No vector store data found (neither pgvector nor FAISS)")
+        return False
     
     def similarity_search(
         self, 
@@ -163,39 +115,35 @@ class VectorStoreManager:
         k: int = 5
     ) -> List[Document]:
         """
-        Perform similarity search on the vector store.
+        Perform similarity search.
         
         Args:
             query: Search query
-            k: Number of results to return (top-k)
+            k: Number of results
             
         Returns:
             List[Document]: Most similar documents
-            
-        Viva Explanation:
-        - Query is embedded using same model as documents
-        - FAISS finds k-nearest neighbors in vector space
-        - Returns documents ordered by similarity
         """
-        # Lazy load if not already loaded
-        if self._vector_store is None:
+        # Lazy load if not initialized
+        if not self._initialized:
             logger.info("Lazy loading vector store for first request...")
-            try:
-                self.load()
-            except Exception as e:
-                logger.error(f"Failed to lazy load vector store: {e}")
-                # Return empty list if loading fails to prevent crash
+            if not self.load():
+                logger.error("Vector store not available")
                 return []
         
-        if self._vector_store is None:
-             raise ValueError("Vector store failed to load")
+        # Use pgvector if available and has data
+        if self._use_pgvector and self._check_pgvector_data():
+            return pgvector_store.similarity_search(query, k)
         
-        logger.debug(f"Searching for: {query[:100]}...")
+        # Use FAISS
+        if self._faiss_store:
+            logger.debug(f"Searching FAISS for: {query[:100]}...")
+            results = self._faiss_store.similarity_search(query, k=k)
+            logger.debug(f"Found {len(results)} results")
+            return results
         
-        results = self._vector_store.similarity_search(query, k=k)
-        
-        logger.debug(f"Found {len(results)} results")
-        return results
+        logger.error("No vector store available for search")
+        return []
     
     def similarity_search_with_score(
         self, 
@@ -203,7 +151,7 @@ class VectorStoreManager:
         k: int = 5
     ) -> List[Tuple[Document, float]]:
         """
-        Perform similarity search with relevance scores.
+        Perform similarity search with scores.
         
         Args:
             query: Search query
@@ -211,36 +159,38 @@ class VectorStoreManager:
             
         Returns:
             List[Tuple[Document, float]]: Documents with scores
-            
-        Viva Explanation:
-        - Score indicates similarity (lower = more similar for L2)
-        - Useful for filtering low-confidence results
-        - Can set threshold to reject irrelevant documents
         """
-        # Lazy load if not already loaded
-        if self._vector_store is None:
-            logger.info("Lazy loading vector store for first request...")
-            try:
-                self.load()
-            except Exception as e:
-                logger.error(f"Failed to lazy load vector store: {e}")
+        # Lazy load if not initialized
+        if not self._initialized:
+            if not self.load():
                 return []
-
-        if self._vector_store is None:
-             raise ValueError("Vector store failed to load")
         
-        results = self._vector_store.similarity_search_with_score(query, k=k)
-        return results
+        # Use pgvector if available
+        if self._use_pgvector and self._check_pgvector_data():
+            return pgvector_store.similarity_search_with_score(query, k)
+        
+        # Use FAISS
+        if self._faiss_store:
+            return self._faiss_store.similarity_search_with_score(query, k=k)
+        
+        return []
     
     def is_loaded(self) -> bool:
         """Check if vector store is loaded."""
-        return self._vector_store is not None
+        return self._initialized
     
     def get_document_count(self) -> int:
-        """Get the number of documents in the index."""
-        if self._vector_store is None:
-            return 0
-        return len(self._vector_store.docstore._dict)
+        """Get the number of documents."""
+        if self._use_pgvector and PGVECTOR_AVAILABLE:
+            try:
+                return pgvector_store.get_document_count()
+            except:
+                pass
+        
+        if self._faiss_store:
+            return len(self._faiss_store.docstore._dict)
+        
+        return 0
 
 
 # Global vector store manager instance
@@ -248,22 +198,12 @@ vector_store_manager = VectorStoreManager()
 
 
 def load_vector_store() -> VectorStoreManager:
-    """
-    Load the global vector store.
-    
-    Returns:
-        VectorStoreManager: Loaded manager instance
-    """
+    """Load the global vector store."""
     if not vector_store_manager.is_loaded():
         vector_store_manager.load()
     return vector_store_manager
 
 
 def get_vector_store() -> VectorStoreManager:
-    """
-    Get the vector store manager (for dependency injection).
-    
-    Returns:
-        VectorStoreManager: Global manager instance
-    """
+    """Get the vector store manager (for dependency injection)."""
     return vector_store_manager
