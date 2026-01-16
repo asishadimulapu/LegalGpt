@@ -10,9 +10,8 @@ langchain-google-genai>=0.0.6
 langchain-openai>=0.0.5
 langchain-groq>=0.0.1
 google-generativeai>=0.3.2
-faiss-cpu>=1.7.4
 
-# Database
+# Database + Vector Store (pgvector - no FAISS files needed!)
 sqlalchemy>=2.0.25
 psycopg2-binary>=2.9.9
 asyncpg>=0.29.0
@@ -34,5 +33,5 @@ httpx>=0.26.0
 tenacity>=8.2.3
 PyMuPDF>=1.23.0
 
-# Embeddings - required for FAISS (built with all-MiniLM-L6-v2)
-sentence-transformers>=2.2.2
+# NOTE: sentence-transformers REMOVED (saves 400MB!)
+# Using HuggingFace Inference API for embeddings - set EMBEDDING_PROVIDER=huggingface_api

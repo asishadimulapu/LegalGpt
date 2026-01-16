@@ -64,6 +64,11 @@ htmlcov/
 # mypy
 .mypy_cache/
 
+# FAISS index files (using pgvector instead)
+data/faiss_index/
+*.faiss
+*.pkl
+
 # AI models (large files)
 models/
 *.bin
