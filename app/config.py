@@ -39,12 +39,11 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.0  # Deterministic for legal accuracy
     
     # Embedding provider (Groq/OpenRouter don't provide embeddings)
-    # "huggingface_api" = FREE cloud embeddings (RECOMMENDED for deploy!)
+    # "jina" = Jina AI cloud embeddings (RECOMMENDED for deploy! Free 1M tokens/month)
     # "huggingface" = local embeddings (needs sentence-transformers, 400MB)
     # "gemini" or "openai" = API-based
-    embedding_provider: Literal["huggingface_api", "huggingface", "gemini", "openai"] = "huggingface_api"
-    huggingface_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
-    huggingface_api_key: str = ""
+    embedding_provider: Literal["jina", "huggingface", "gemini", "openai"] = "jina"
+    jina_api_key: str = ""
     
     # -------------------------------------------------------------------------
     # Database Configuration

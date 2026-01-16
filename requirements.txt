@@ -33,5 +33,6 @@ httpx>=0.26.0
 tenacity>=8.2.3
 PyMuPDF>=1.23.0
 
-# NOTE: sentence-transformers REMOVED (saves 400MB!)
+# Embeddings - using local model (HuggingFace API deprecated)
+sentence-transformers>=2.2.2
 # Using HuggingFace Inference API for embeddings - set EMBEDDING_PROVIDER=huggingface_api

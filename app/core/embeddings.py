@@ -21,39 +21,48 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
-class HuggingFaceInferenceAPIEmbeddings(Embeddings):
+class JinaAIEmbeddings(Embeddings):
     """
-    Hugging Face Inference API embeddings - no local model needed!
+    Jina AI embeddings - free tier, fast, reliable!
     
     Viva Explanation:
-    - Uses HuggingFace's free Inference API
-    - Same model (all-MiniLM-L6-v2) but runs in the cloud
-    - No 400MB sentence-transformers dependency!
-    - Free tier: 1000 calls/hour
+    - Uses Jina AI's free Embedding API
+    - jina-embeddings-v3 model (1024 dims, but we'll use v2 for 768)
+    - Free tier: 1M tokens/month
+    - No heavy dependencies!
     """
     
-    def __init__(self, api_key: str, model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
+    def __init__(self, api_key: str, model_name: str = "jina-embeddings-v2-base-en"):
         self.api_key = api_key
         self.model_name = model_name
-        self.api_url = f"https://router.huggingface.co/hf-inference/pipeline/feature-extraction/{model_name}"
+        self.api_url = "https://api.jina.ai/v1/embeddings"
     
     def _embed(self, texts: List[str]) -> List[List[float]]:
-        """Call HuggingFace Inference API."""
+        """Call Jina AI Embedding API."""
         import httpx
         
-        headers = {"Authorization": f"Bearer {self.api_key}"}
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
         
         response = httpx.post(
             self.api_url,
             headers=headers,
-            json={"inputs": texts, "options": {"wait_for_model": True}},
+            json={
+                "model": self.model_name,
+                "input": texts
+            },
             timeout=60.0
         )
         
         if response.status_code != 200:
-            raise ValueError(f"HuggingFace API error: {response.status_code} - {response.text}")
+            raise ValueError(f"Jina AI API error: {response.status_code} - {response.text}")
         
-        return response.json()
+        result = response.json()
+        # Extract embeddings from response
+        embeddings = [item["embedding"] for item in result["data"]]
+        return embeddings
     
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         """Embed multiple documents."""
@@ -65,6 +74,7 @@ class HuggingFaceInferenceAPIEmbeddings(Embeddings):
         return result[0]
 
 
+
 def get_embedding_model() -> Embeddings:
     """
     Get the configured embedding model.
@@ -74,23 +84,23 @@ def get_embedding_model() -> Embeddings:
         
     Viva Explanation:
     - Factory pattern for creating embedding model
-    - huggingface_api = FREE cloud embeddings (recommended for deploy!)
+    - jina = Jina AI cloud embeddings (RECOMMENDED for deploy!)
     - huggingface = Local embeddings (needs sentence-transformers)
     - gemini = Google embeddings (768 dimensions)
     """
     provider = settings.embedding_provider
     
-    # HuggingFace Inference API - RECOMMENDED for deployment (no local model!)
-    if provider == "huggingface_api":
-        api_key = os.getenv("HUGGINGFACE_API_KEY") or settings.huggingface_api_key
+    # Jina AI - RECOMMENDED for deployment (free, fast, reliable!)
+    if provider == "jina":
+        api_key = os.getenv("JINA_API_KEY") or getattr(settings, 'jina_api_key', '')
         
         if not api_key:
-            raise ValueError("HUGGINGFACE_API_KEY is required for HuggingFace API embeddings")
+            raise ValueError("JINA_API_KEY is required for Jina AI embeddings")
         
-        logger.info("Using HuggingFace Inference API embeddings (cloud, no local model)")
-        return HuggingFaceInferenceAPIEmbeddings(
+        logger.info("Using Jina AI embeddings (cloud, no local model)")
+        return JinaAIEmbeddings(
             api_key=api_key,
-            model_name=settings.huggingface_embedding_model
+            model_name="jina-embeddings-v2-base-en"
         )
     
     # Local HuggingFace - needs sentence-transformers (400MB)
@@ -206,6 +216,8 @@ class EmbeddingGenerator:
             return 1536
         elif settings.embedding_provider == "gemini":
             return 768
+        elif settings.embedding_provider == "jina":
+            return 768  # jina-embeddings-v2-base-en dimension
         elif settings.embedding_provider in ["huggingface", "huggingface_api"]:
             return 384  # all-MiniLM-L6-v2 dimension
         else:
