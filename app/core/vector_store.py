@@ -191,6 +191,39 @@ class VectorStoreManager:
             return len(self._faiss_store.docstore._dict)
         
         return 0
+    
+    def create_from_documents(self, documents: List[Document], save: bool = True) -> None:
+        """
+        Create FAISS index from documents.
+        
+        Args:
+            documents: List of documents to index
+            save: Whether to save the index to disk
+            
+        Viva Explanation:
+        - Creates embeddings for all documents
+        - Builds FAISS index for similarity search
+        - Saves index to disk for persistence
+        """
+        from langchain_community.vectorstores import FAISS
+        
+        logger.info(f"Creating FAISS index from {len(documents)} documents...")
+        
+        # Create FAISS index from documents
+        self._faiss_store = FAISS.from_documents(
+            documents=documents,
+            embedding=self.embeddings
+        )
+        
+        self._initialized = True
+        
+        if save:
+            # Ensure directory exists
+            Path(self.index_path).mkdir(parents=True, exist_ok=True)
+            
+            # Save the index
+            self._faiss_store.save_local(str(self.index_path))
+            logger.info(f"FAISS index saved to {self.index_path}")
 
 
 # Global vector store manager instance
