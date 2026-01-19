@@ -1,78 +1,23 @@
 # Indian Law RAG Chatbot - Embedding Generation
 """
-Embedding generation utilities supporting HuggingFace API, local, OpenAI, and Gemini.
+Embedding generation utilities supporting HuggingFace, OpenAI, and Gemini.
 Converts text into high-dimensional vectors for semantic search.
 
 Viva Explanation:
 - Embeddings are numerical representations of text
 - Semantically similar text has similar embeddings
-- Used for finding relevant documents in pgvector/FAISS
-- HuggingFace Inference API = FREE cloud embeddings (no local model!)
+- Used for finding relevant documents in FAISS
+- HuggingFace embeddings are FREE and run locally
 """
 
 from typing import List, Optional
 import logging
-import os
 
 from langchain_core.embeddings import Embeddings
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
-
-
-class JinaAIEmbeddings(Embeddings):
-    """
-    Jina AI embeddings - free tier, fast, reliable!
-    
-    Viva Explanation:
-    - Uses Jina AI's free Embedding API
-    - jina-embeddings-v3 model (1024 dims, but we'll use v2 for 768)
-    - Free tier: 1M tokens/month
-    - No heavy dependencies!
-    """
-    
-    def __init__(self, api_key: str, model_name: str = "jina-embeddings-v2-base-en"):
-        self.api_key = api_key
-        self.model_name = model_name
-        self.api_url = "https://api.jina.ai/v1/embeddings"
-    
-    def _embed(self, texts: List[str]) -> List[List[float]]:
-        """Call Jina AI Embedding API."""
-        import httpx
-        
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        response = httpx.post(
-            self.api_url,
-            headers=headers,
-            json={
-                "model": self.model_name,
-                "input": texts
-            },
-            timeout=60.0
-        )
-        
-        if response.status_code != 200:
-            raise ValueError(f"Jina AI API error: {response.status_code} - {response.text}")
-        
-        result = response.json()
-        # Extract embeddings from response
-        embeddings = [item["embedding"] for item in result["data"]]
-        return embeddings
-    
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        """Embed multiple documents."""
-        return self._embed(texts)
-    
-    def embed_query(self, text: str) -> List[float]:
-        """Embed a single query."""
-        result = self._embed([text])
-        return result[0]
-
 
 
 def get_embedding_model() -> Embeddings:
@@ -84,42 +29,22 @@ def get_embedding_model() -> Embeddings:
         
     Viva Explanation:
     - Factory pattern for creating embedding model
-    - jina = Jina AI cloud embeddings (RECOMMENDED for deploy!)
-    - huggingface = Local embeddings (needs sentence-transformers)
-    - gemini = Google embeddings (768 dimensions)
+    - Uses embedding_provider setting (separate from llm_provider)
+    - HuggingFace = FREE local embeddings (no API key needed!)
+    - OpenAI = 'text-embedding-ada-002' (1536 dimensions)
+    - Gemini = 'models/embedding-001' (768 dimensions)
     """
     provider = settings.embedding_provider
     
-    # Jina AI - RECOMMENDED for deployment (free, fast, reliable!)
-    if provider == "jina":
-        api_key = os.getenv("JINA_API_KEY") or getattr(settings, 'jina_api_key', '')
-        
-        if not api_key:
-            raise ValueError("JINA_API_KEY is required for Jina AI embeddings")
-        
-        logger.info("Using Jina AI embeddings (cloud, no local model)")
-        return JinaAIEmbeddings(
-            api_key=api_key,
-            model_name="jina-embeddings-v2-base-en"
-        )
-    
-    # Local HuggingFace - needs sentence-transformers (400MB)
     if provider == "huggingface":
-        try:
-            from langchain_community.embeddings import HuggingFaceEmbeddings
-            
-            logger.info(f"Using HuggingFace local embeddings: {settings.huggingface_embedding_model}")
-            return HuggingFaceEmbeddings(
-                model_name=settings.huggingface_embedding_model,
-                model_kwargs={'device': 'cpu'},
-                encode_kwargs={'normalize_embeddings': True}
-            )
-        except ImportError:
-            logger.warning("sentence-transformers not installed, falling back to HuggingFace API")
-            api_key = os.getenv("HUGGINGFACE_API_KEY")
-            if api_key:
-                return HuggingFaceInferenceAPIEmbeddings(api_key=api_key)
-            raise ImportError("Install sentence-transformers or set HUGGINGFACE_API_KEY")
+        from langchain_community.embeddings import HuggingFaceEmbeddings
+        
+        logger.info(f"Using HuggingFace local embeddings: {settings.huggingface_embedding_model}")
+        return HuggingFaceEmbeddings(
+            model_name=settings.huggingface_embedding_model,
+            model_kwargs={'device': 'cpu'},
+            encode_kwargs={'normalize_embeddings': True}
+        )
     
     if provider == "openai":
         from langchain_openai import OpenAIEmbeddings
@@ -216,9 +141,7 @@ class EmbeddingGenerator:
             return 1536
         elif settings.embedding_provider == "gemini":
             return 768
-        elif settings.embedding_provider == "jina":
-            return 768  # jina-embeddings-v2-base-en dimension
-        elif settings.embedding_provider in ["huggingface", "huggingface_api"]:
+        elif settings.embedding_provider == "huggingface":
             return 384  # all-MiniLM-L6-v2 dimension
         else:
             # Generate a test embedding to determine dimension

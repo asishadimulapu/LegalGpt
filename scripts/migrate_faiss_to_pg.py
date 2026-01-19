@@ -124,8 +124,9 @@ def migrate_embeddings(faiss_store, batch_size=100):
                         logger.warning(f"Could not find index position for doc {doc_id}")
                         continue
                     
-                    # Get embedding vector from FAISS index
-                    embedding_vector = faiss_store.index.reconstruct(index_pos).tolist()
+                    # Re-generate embedding with current embedding model (Jina AI)
+                    # This creates a 768-dim vector instead of 384-dim FAISS vector
+                    embedding_vector = embeddings.embed_query(doc.page_content)
                     
                     metadata = doc.metadata or {}
                     

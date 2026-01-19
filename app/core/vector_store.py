@@ -38,7 +38,7 @@ class VectorStoreManager:
     - FAISS used as fallback for local development
     """
     
-    def __init__(self, index_path: Optional[str] = None, use_pgvector: bool = True):
+    def __init__(self, index_path: Optional[str] = None, use_pgvector: bool = False):
         """
         Initialize the vector store manager.
         

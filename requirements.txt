@@ -10,6 +10,7 @@ langchain-google-genai>=0.0.6
 langchain-openai>=0.0.5
 langchain-groq>=0.0.1
 google-generativeai>=0.3.2
+faiss-cpu>=1.7.4
 
 # Database + Vector Store (pgvector - no FAISS files needed!)
 sqlalchemy>=2.0.25

@@ -65,22 +65,21 @@ async def health_check(
         }
         overall_healthy = False
     
-    # Check vector store (pgvector)
+    # Check vector store (FAISS)
     try:
-        from app.core.pgvector_store import pgvector_store
-        doc_count = pgvector_store.get_document_count()
-        vs_loaded = doc_count > 0
+        vs_loaded = vector_store.is_loaded()
+        doc_count = vector_store.get_document_count() if vs_loaded else 0
         components["vector_store"] = {
-            "status": "healthy" if vs_loaded else "empty",
-            "type": "pgvector",
+            "status": "healthy" if vs_loaded else "not_loaded",
+            "type": "faiss",
             "document_count": doc_count
         }
         if not vs_loaded:
-            components["vector_store"]["message"] = "Run migration script to populate pgvector"
+            # Vector store not loaded is a warning, not an error
+            components["vector_store"]["message"] = "Run data pipeline to create index"
     except Exception as e:
         components["vector_store"] = {
             "status": "error",
-            "type": "pgvector",
             "error": str(e)
         }
     

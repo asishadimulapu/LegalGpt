@@ -146,18 +146,17 @@ class PgVectorStore:
         try:
             # Use cosine distance for similarity search
             # pgvector uses <=> for cosine distance, <-> for L2
+            # Format embedding as PostgreSQL array string
+            embedding_str = "[" + ",".join(map(str, query_embedding)) + "]"
+            
             results = db.execute(
-                text("""
+                text(f"""
                     SELECT id, content, source, section, title, act_type, extra_data,
-                           1 - (embedding <=> :query_embedding::vector) as similarity
+                           1 - (embedding <=> '{embedding_str}'::vector) as similarity
                     FROM document_embeddings
-                    ORDER BY embedding <=> :query_embedding::vector
-                    LIMIT :limit
-                """),
-                {
-                    "query_embedding": str(query_embedding),
-                    "limit": k
-                }
+                    ORDER BY embedding <=> '{embedding_str}'::vector
+                    LIMIT {k}
+                """)
             ).fetchall()
             
             # Convert to LangChain Documents
