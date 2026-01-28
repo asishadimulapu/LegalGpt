@@ -63,6 +63,38 @@ class PgVectorStore:
             logger.error(f"Failed to initialize pgvector: {e}")
             return False
     
+    def create_hnsw_index(self, m: int = 16, ef_construction: int = 64) -> bool:
+        """
+        Create HNSW index for fast approximate nearest neighbor search.
+        
+        Args:
+            m: Maximum number of connections per layer (default 16)
+            ef_construction: Build-time accuracy tradeoff (default 64)
+            
+        Returns:
+            bool: True if index created successfully
+            
+        Viva Explanation:
+        - HNSW (Hierarchical Navigable Small World) is faster than brute-force
+        - Good for large datasets (10k+ documents)
+        - Tradeoff: slightly approximate but much faster
+        """
+        try:
+            with engine.connect() as conn:
+                # Create HNSW index for cosine similarity
+                conn.execute(text("""
+                    CREATE INDEX IF NOT EXISTS document_embeddings_hnsw_idx 
+                    ON document_embeddings 
+                    USING hnsw (embedding vector_cosine_ops)
+                    WITH (m = :m, ef_construction = :ef_construction)
+                """), {"m": m, "ef_construction": ef_construction})
+                conn.commit()
+                logger.info("HNSW index created for document_embeddings")
+                return True
+        except Exception as e:
+            logger.error(f"Failed to create HNSW index: {e}")
+            return False
+    
     def add_documents(
         self, 
         documents: List[Document],
@@ -144,19 +176,23 @@ class PgVectorStore:
         
         db = SessionLocal()
         try:
-            # Use cosine distance for similarity search
-            # pgvector uses <=> for cosine distance, <-> for L2
-            # Format embedding as PostgreSQL array string
+            # Use parameterized query to prevent SQL injection
+            # pgvector <=> is cosine distance (0=identical, 2=opposite)
+            # Convert to similarity: 1 - (distance / 2) for normalized score
             embedding_str = "[" + ",".join(map(str, query_embedding)) + "]"
             
             results = db.execute(
-                text(f"""
+                text("""
                     SELECT id, content, source, section, title, act_type, extra_data,
-                           1 - (embedding <=> '{embedding_str}'::vector) as similarity
+                           1 - (embedding <=> :query_embedding::vector) as similarity
                     FROM document_embeddings
-                    ORDER BY embedding <=> '{embedding_str}'::vector
-                    LIMIT {k}
-                """)
+                    ORDER BY embedding <=> :query_embedding::vector
+                    LIMIT :limit
+                """),
+                {
+                    "query_embedding": embedding_str,
+                    "limit": k
+                }
             ).fetchall()
             
             # Convert to LangChain Documents
@@ -199,9 +235,10 @@ class PgVectorStore:
             k: Number of results
             
         Returns:
-            List[Tuple[Document, float]]: Documents with similarity scores
+            List[Tuple[Document, float]]: Documents with similarity scores (0-1, higher=better)
         """
         query_embedding = self.embeddings.embed_query(query)
+        embedding_str = "[" + ",".join(map(str, query_embedding)) + "]"
         
         db = SessionLocal()
         try:
@@ -214,7 +251,7 @@ class PgVectorStore:
                     LIMIT :limit
                 """),
                 {
-                    "query_embedding": str(query_embedding),
+                    "query_embedding": embedding_str,
                     "limit": k
                 }
             ).fetchall()
@@ -234,8 +271,10 @@ class PgVectorStore:
                     metadata=metadata
                 )
                 # Convert distance to similarity (1 - distance for cosine)
-                score = float(row.distance) if row.distance else 1.0
-                documents_with_scores.append((doc, score))
+                # Cosine distance ranges from 0 (identical) to 2 (opposite)
+                distance = float(row.distance) if row.distance else 0
+                similarity = 1.0 - distance
+                documents_with_scores.append((doc, similarity))
             
             return documents_with_scores
             

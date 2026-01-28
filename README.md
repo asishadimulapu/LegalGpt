@@ -1,204 +1,102 @@
-🏛️ Indian Law RAG Chatbot
+# Judgment-Aware Legal Information Retrieval System
 
+A Retrieval-Augmented Generation (RAG) based legal reasoning engine for Indian law.
 
+## Features
 
+- **RAG Architecture**: Semantic search over Indian statutes and judicial judgments
+- **Vector Database**: ChromaDB for efficient legal document retrieval
+- **Legal Reasoning**: Structured analysis following judicial methodology
+- **Hallucination Reduction**: Strict citation verification and confidence scoring
+- **API-First**: FastAPI backend for integration with frontend applications
 
+## Legal Scope
 
+- Constitution of India
+- IPC / Bharatiya Nyaya Sanhita (BNS)
+- CrPC / Bharatiya Nagarik Suraksha Sanhita (BNSS)
+- Indian Evidence Act / Bharatiya Sakshya Adhiniyam
+- Special Criminal Laws (IT Act, NDPS, POCSO)
+- Supreme Court & High Court judgments
 
+## Installation
 
-
-
-
-
-
-An AI-powered legal question-answering system for Indian laws using Retrieval-Augmented Generation (RAG)
-
-📌 Overview
-
-The Indian Law RAG Chatbot is a production-ready AI system that answers legal questions strictly based on Indian law documents.
-It eliminates hallucinations by grounding every response in verified legal texts and provides precise Act and Section-level citations.
-
-This project is designed for:
-
-Academic demonstrations
-
-Legal-tech research
-
-Viva and interviews
-
-Scalable deployment
-
-✨ Key Features
-
-🔍 Semantic Legal Search using embeddings
-
-🤖 RAG Pipeline (Retrieval + Generation)
-
-📝 Mandatory Legal Citations (Act & Section)
-
-🔒 Anti-Hallucination Enforcement
-
-💬 Session-based Chat History
-
-🔐 JWT Authentication (Optional)
-
-📊 Query Logging & Analytics
-
-🚀 Production-Ready FastAPI Backend
-
-🏗️ Architecture
-User Query
-   │
-   ▼
-FastAPI Backend
-   │
-   ▼
-Embedding Generation (Gemini / OpenAI)
-   │
-   ▼
-FAISS Vector Search (Top-K Chunks)
-   │
-   ▼
-LLM Generation (Context-Only)
-   │
-   ▼
-Answer + Legal Citations
-
-🛠️ Tech Stack
-Layer	Technology
-Backend	FastAPI
-AI Orchestration	LangChain
-LLM	Gemini / OpenAI
-Embeddings	Gemini / OpenAI
-Vector Store	FAISS
-Database	PostgreSQL
-Auth	JWT
-Dataset	viber1/indian-law-dataset
-📂 Supported Legal Sources
-
-Constitution of India
-
-Indian Penal Code (IPC)
-
-Code of Criminal Procedure (CrPC)
-
-Code of Civil Procedure (CPC)
-
-Indian Evidence Act
-
-🚀 Installation
-1️⃣ Clone Repository
-git clone https://github.com/yourusername/indian-law-rag-chatbot.git
-cd indian-law-rag-chatbot
-
-2️⃣ Create Virtual Environment
+```bash
+# Create virtual environment
 python -m venv venv
-venv\Scripts\activate   # Windows
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-3️⃣ Install Dependencies
+# Install dependencies
 pip install -r requirements.txt
 
-⚙️ Configuration
+# Setup environment
+cp .env.example .env
+# Edit .env with your configuration
+```
 
-Create a .env file:
+## Project Structure
 
-LLM_PROVIDER=gemini
-GOOGLE_API_KEY=your_gemini_api_key
+```
+Major-Project/
+├── src/
+│   ├── api/
+│   │   └── main.py              # FastAPI application
+│   ├── rag/
+│   │   ├── vector_store.py      # Vector database operations
+│   │   ├── document_processor.py # Legal document chunking
+│   │   └── rag_engine.py        # RAG retrieval logic
+│   ├── reasoning/
+│   │   └── legal_reasoning.py   # Legal analysis engine
+│   ├── config.py                # Configuration management
+│   └── utils.py                 # Utility functions
+├── data/
+│   ├── legal_documents/         # Source documents
+│   └── chroma_db/              # Vector store
+├── scripts/
+│   └── index_documents.py      # Document indexing utility
+└── tests/                      # Test suite
+```
 
-DATABASE_URL=postgresql://postgres:password@localhost:5432/indian_law_db
+## Usage
 
-FAISS_INDEX_PATH=./data/faiss_index
-TOP_K_RESULTS=5
-CHUNK_SIZE=800
-CHUNK_OVERLAP=150
+### 1. Index Legal Documents
 
-📦 Dataset & Indexing
-python scripts/load_dataset.py
-python scripts/create_embeddings.py
+```bash
+python scripts/index_documents.py
+```
 
+### 2. Start API Server
 
-This will:
+```bash
+python src/api/main.py
+# Or with uvicorn:
+uvicorn src.api.main:app --reload
+```
 
-Load Indian law dataset
+### 3. Query the System
 
-Chunk documents
+```bash
+curl -X POST "http://localhost:8000/api/query" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What is the punishment for theft under IPC?"
+  }'
+```
 
-Generate embeddings
+## API Endpoints
 
-Build FAISS index
+- `POST /api/query` - Submit legal query
+- `POST /api/ingest` - Add new legal documents
+- `GET /api/health` - System health check
+- `GET /api/stats` - Vector store statistics
 
-▶️ Run the Application
-python run.py
+## Safety & Ethics
 
+- **No Legal Advice**: System provides legal information, not advice
+- **Citation Required**: All responses traceable to source documents
+- **Confidence Scoring**: Low-confidence responses flagged explicitly
+- **Judicial Neutrality**: No bias in legal interpretation
 
-📍 API available at:
+## License
 
-http://localhost:8000
-
-📡 API Endpoints
-Health Check
-GET /health
-
-Chat (RAG Query)
-POST /api/v1/chat
-
-
-Request
-
-{
-  "query": "What is the punishment for theft under IPC?"
-}
-
-
-Response
-
-{
-  "answer": "Under Section 378 of the IPC...",
-  "sources": [
-    {
-      "act": "Indian Penal Code",
-      "section": "378"
-    }
-  ]
-}
-
-🛡️ Anti-Hallucination Strategy
-
-✔ Context-only generation
-✔ Temperature set to zero
-✔ Mandatory citations
-✔ Fallback response if no data found
-
-Fallback Message
-
-"The requested information is not available in the provided legal documents."
-
-🎓 Viva-Ready Explanation
-
-Why RAG for Legal AI?
-
-Prevents hallucinations
-
-Ensures source-grounded answers
-
-No model retraining required
-
-High trust & transparency
-
-Why FAISS?
-
-Fast vector similarity search
-
-Scales to large legal corpora
-
-Memory efficient
-
-📄 License
-
-MIT License
-
-🙏 Acknowledgements
-
-Dataset: viber1/indian-law-dataset
-
-Built using FastAPI, LangChain, FAISS
+For educational and research purposes only.

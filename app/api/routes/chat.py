@@ -121,15 +121,25 @@ async def chat(
         )
     
     except Exception as e:
-        logger.error(f"Chat error: {e}")
+        # Enhanced structured error logging
+        import traceback
+        error_details = {
+            "error_type": type(e).__name__,
+            "error_message": str(e),
+            "query": request.query[:100],  # Truncate for logging
+            "user_id": str(user_id) if user_id else None,
+            "session_id": str(session.id) if session else None,
+            "traceback": traceback.format_exc()
+        }
+        logger.error(f"Chat error: {error_details}")
         
-        # Log failed query
+        # Log failed query with error details
         QueryLogCRUD.create(
             db=db,
             query=request.query,
             user_id=user_id,
             was_successful=False,
-            error_message=str(e)
+            error_message=f"{type(e).__name__}: {str(e)}"
         )
         
         raise HTTPException(

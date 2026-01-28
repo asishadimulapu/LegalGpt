@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "NyayaSahay",
+    "slug": "nyayasahay-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a1f2e"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nyayasahay.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1a1f2e"
+      },
+      "package": "com.nyayasahay.mobile"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-secure-store",
+      "expo-asset"
+    ],
+    "scheme": "nyayasahay",
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "61c2cd27-8cb3-4cc1-87ca-49a6332cd259"
+      }
+    }
+  }
+}

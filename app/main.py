@@ -129,11 +129,12 @@ app = FastAPI(
 # Middleware Configuration
 # =============================================================================
 # CORS middleware for frontend integration
+# Security: Origins are configured based on environment
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure properly for production
+    allow_origins=settings.get_cors_origins,  # Environment-based origins
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Explicit methods
     allow_headers=["*"],
 )
 

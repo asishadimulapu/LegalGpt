@@ -1,39 +1,37 @@
-# FastAPI and Server
-fastapi>=0.109.0
-uvicorn[standard]>=0.27.0
-python-multipart>=0.0.6
+# Core API Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
 
-# LangChain and AI
-langchain>=0.1.0
-langchain-community>=0.0.13
-langchain-google-genai>=0.0.6
-langchain-openai>=0.0.5
-langchain-groq>=0.0.1
-google-generativeai>=0.3.2
-faiss-cpu>=1.7.4
+# RAG & Vector Database
+chromadb==0.4.22
+sentence-transformers==2.3.1
+langchain==0.1.4
+langchain-community==0.0.16
 
-# Database + Vector Store (pgvector - no FAISS files needed!)
-sqlalchemy>=2.0.25
-psycopg2-binary>=2.9.9
-asyncpg>=0.29.0
-pgvector>=0.2.0
+# Document Processing
+pypdf2==3.0.1
+python-docx==1.1.0
+python-multipart==0.0.6
 
-# Configuration
-python-dotenv>=1.0.0
-pydantic>=2.5.0
-pydantic-settings>=2.1.0
-email-validator>=2.0.0
+# Machine Learning & Embeddings
+torch==2.1.2
+transformers==4.36.2
+numpy==1.26.3
 
-# Authentication
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
-bcrypt>=4.1.2
+# Indian Legal NLP (optional)
+indic-nlp-library==0.92
+
+# Database & Caching
+redis==5.0.1
+pymongo==4.6.1
 
 # Utilities
-httpx>=0.26.0
-tenacity>=8.2.3
-PyMuPDF>=1.23.0
+python-dotenv==1.0.0
+requests==2.31.0
+beautifulsoup4==4.12.3
+tqdm==4.66.1
 
-# Embeddings - using local model (HuggingFace API deprecated)
-sentence-transformers>=2.2.2
-# Using HuggingFace Inference API for embeddings - set EMBEDDING_PROVIDER=huggingface_api
+# Logging & Monitoring
+python-json-logger==2.0.7

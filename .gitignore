@@ -1,13 +1,12 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
-
-# Distribution / packaging
 .Python
+env/
+venv/
+ENV/
 build/
 develop-eggs/
 dist/
@@ -24,57 +23,50 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual environments
-venv/
-ENV/
-env/
-.venv/
+# Environment
+.env
+.venv
 
-# IDE
-.idea/
+# IDEs
 .vscode/
+.idea/
 *.swp
 *.swo
+*~
 
-# Environment variables
-.env
-.env.local
-.env.*.local
-
-# Database
+# Data & Models
+data/
+models/
 *.db
-*.sqlite3
+*.sqlite
+chroma_db/
 
 # Logs
 logs/
 *.log
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints/
 
-# pytest
+# Testing
 .pytest_cache/
 .coverage
 htmlcov/
 
-# mypy
-.mypy_cache/
-
-# FAISS index files (using pgvector instead)
-data/faiss_index/
-*.faiss
-*.pkl
-
-# AI models (large files)
-models/
-*.bin
-*.pt
-*.pth
-*.onnx
-
-# Node modules
+# Node/NPM
 node_modules/
+npm-debug.log*
+
+# Mobile App
+mobile_app/.expo/
+mobile_app/android/
+mobile_app/ios/
+*.apk
+*.aab
+
+# Temp folders
+temp_sdk54/

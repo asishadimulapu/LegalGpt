@@ -141,12 +141,55 @@ class RAGPipeline:
         """
         k = top_k or settings.top_k_results
         
-        logger.info(f"Retrieving top-{k} documents for query: {query[:100]}...")
+        # Enhance query for section number queries
+        enhanced_query = self._enhance_section_query(query)
         
-        documents = self.vector_store.similarity_search(query, k=k)
+        logger.info(f"Retrieving top-{k} documents for query: {enhanced_query[:100]}...")
+        
+        documents = self.vector_store.similarity_search(enhanced_query, k=k)
         
         logger.info(f"Retrieved {len(documents)} documents")
         return documents
+    
+    def _enhance_section_query(self, query: str) -> str:
+        """
+        Enhance queries about specific sections for better retrieval.
+        
+        If user asks "What is Section 65B", expand to include relevant keywords
+        that improve semantic matching.
+        """
+        import re
+        
+        # Check for section/article references
+        section_match = re.search(r'section\s*(\d+[A-Za-z]*)', query, re.IGNORECASE)
+        article_match = re.search(r'article\s*(\d+[A-Za-z]*)', query, re.IGNORECASE)
+        
+        if section_match:
+            section_num = section_match.group(1)
+            # Add context keywords to improve matching
+            enhanced = f"{query} Section {section_num} legal provision Indian law"
+            
+            # Special handling for known important sections
+            section_context = {
+                "65B": "electronic records admissibility Evidence Act computer output",
+                "65A": "electronic record Evidence Act",
+                "302": "murder punishment IPC death penalty",
+                "304": "culpable homicide not amounting to murder IPC",
+                "420": "cheating IPC dishonestly",
+                "498A": "cruelty by husband IPC domestic violence",
+                "376": "rape IPC sexual assault",
+            }
+            
+            if section_num.upper() in section_context:
+                enhanced = f"{query} {section_context[section_num.upper()]}"
+            
+            return enhanced
+        
+        if article_match:
+            article_num = article_match.group(1)
+            return f"{query} Article {article_num} Constitution of India fundamental rights"
+        
+        return query
     
     def retrieve_with_scores(
         self, 

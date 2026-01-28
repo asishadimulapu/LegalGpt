@@ -47,12 +47,12 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     # Database Configuration
     # -------------------------------------------------------------------------
-    database_url: str = "postgresql://postgres:password@localhost:5432/indian_law_db"
+    database_url: str = ""  # Required: set in .env
     db_host: str = "localhost"
     db_port: int = 5432
     db_name: str = "indian_law_db"
     db_user: str = "postgres"
-    db_password: str = "password"
+    db_password: str = ""  # Required: set in .env
     
     # -------------------------------------------------------------------------
     # FAISS Vector Store
@@ -62,25 +62,37 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     # Application Settings
     # -------------------------------------------------------------------------
-    app_env: Literal["development", "staging", "production"] = "development"
+    app_env: Literal["development", "staging", "production"] = "production"  # Default to production for safety
     app_name: str = "Indian Law RAG Chatbot"
     app_version: str = "1.0.0"
-    debug: bool = True
+    debug: bool = False  # Default to False for production
     log_level: str = "INFO"
+    
+    # CORS Configuration
+    cors_origins: str = ""  # Comma-separated list of allowed origins, empty = allow based on environment
     
     # -------------------------------------------------------------------------
     # JWT Authentication
     # -------------------------------------------------------------------------
-    jwt_secret_key: str = "your-super-secret-key-change-in-production"
+    jwt_secret_key: str = ""  # Required: set in .env for production
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
+    
+    @property
+    def get_cors_origins(self) -> list:
+        """Get CORS origins based on environment."""
+        if self.cors_origins:
+            return [origin.strip() for origin in self.cors_origins.split(",")]
+        if self.is_development:
+            return ["*"]  # Allow all in development
+        return ["https://law-gpt.app"]  # Production default
     
     # -------------------------------------------------------------------------
     # RAG Configuration
     # -------------------------------------------------------------------------
-    top_k_results: int = 5
-    chunk_size: int = 800
-    chunk_overlap: int = 150
+    top_k_results: int = 8
+    chunk_size: int = 1500
+    chunk_overlap: int = 300
     
     @property
     def is_development(self) -> bool:

@@ -224,6 +224,11 @@ def get_ipc_core_sections() -> List[Document]:
             "section": "Section 506",
             "title": "Punishment for criminal intimidation",
             "content": "Section 506 of the Indian Penal Code deals with punishment for criminal intimidation. Whoever commits the offence of criminal intimidation shall be punished with imprisonment of either description for a term which may extend to two years, or with fine, or with both. If threat be to cause death or grievous hurt, or to cause the destruction of any property by fire, or to cause an offence punishable with death or imprisonment for life, the punishment may extend to seven years."
+        },
+        {
+            "section": "Section 299",
+            "title": "Culpable Homicide",
+            "content": "Section 299 of the Indian Penal Code defines Culpable Homicide. Whoever causes death by doing an act with the intention of causing death, or with the intention of causing such bodily injury as is likely to cause death, or with the knowledge that he is likely by such act to cause death, commits the offence of culpable homicide."
         }
     ]
     
@@ -247,6 +252,51 @@ Legal Reference: [Indian Penal Code, {section_data['section']}]"""
         ))
     
     logger.info(f"Added {len(documents)} core IPC sections")
+    return documents
+
+
+def get_it_act_core_sections() -> List[Document]:
+    """Add core IT Act sections (Section 66, 66A, etc.)"""
+    logger.info("Adding core IT Act sections...")
+    
+    sections = [
+        {
+            "section": "Section 66",
+            "title": "Computer Related Offences",
+            "content": "Section 66 of the Information Technology Act, 2000 - Computer Related Offences. If any person, dishonestly or fraudulently, does any act referred to in section 43 (damage to computer, computer system, etc.), he shall be punishable with imprisonment for a term which may extend to three years or with fine which may extend to five lakh rupees or with both. (Note: The term 'hacking' was used in the original 2000 Act but substituted by 'Computer Related Offences' in 2008, expanding the scope)."
+        },
+        {
+            "section": "Section 66A",
+            "title": "Punishment for sending offensive messages through communication service, etc.",
+            "content": "Section 66A of the Information Technology Act, 2000. Any person who sends, by means of a computer resource or a communication device, (a) any information that is grossly offensive or has menacing character; or (b) any information which he knows to be false, but for the purpose of causing annoyance, inconvenience, danger, obstruction, insult, injury, criminal intimidation, enmity, hatred or ill will, persistently by making use of such computer resource or a communication device, (c) any electronic mail or electronic mail message for the purpose of causing annoyance or inconvenience or to deceive or to mislead the addressee or recipient about the origin of such messages, shall be punishable with imprisonment for a term which may extend to three years and with fine. \n\nIMPORTANT: This section was struck down by the Supreme Court of India in Shreya Singhal v. Union of India (2015) as unconstitutional for violating Article 19(1)(a) (Freedom of Speech and Expression)."
+        },
+        {
+            "section": "Section 43",
+            "title": "Penalty and Compensation for damage to computer, computer system, etc.",
+            "content": "Section 43 of the Info Tech Act covers civil liability (penalty/compensation) for unauthorized access, downloading data, introducing viruses, disrupting service, etc. It mandates compensation to the affected person. Section 66 makes these acts criminally punishable if done dishonestly or fraudulently."
+        }
+    ]
+    
+    documents = []
+    for idx, s in enumerate(sections):
+        content = f"""IT Act {s['section']} - {s['title']}
+
+{s['content']}
+
+Legal Reference: [Information Technology Act, 2000, {s['section']}]"""
+        
+        documents.append(Document(
+            page_content=content,
+            metadata={
+                "act_name": "Information Technology Act, 2000",
+                "section": s["section"],
+                "title": s["title"],
+                "source": "core_it_act_sections",
+                "index": idx
+            }
+        ))
+        
+    logger.info(f"Added {len(documents)} core IT Act sections")
     return documents
 
 
@@ -310,6 +360,74 @@ Legal Reference: [Constitution of India, {article_data['article']}]"""
     return documents
 
 
+def get_evidence_act_sections() -> List[Document]:
+    """Add key Evidence Act sections that are commonly asked about."""
+    logger.info("Adding Evidence Act sections...")
+    
+    sections = [
+        {
+            "section": "Section 65B",
+            "title": "Admissibility of electronic records",
+            "content": """Section 65B of the Indian Evidence Act, 1872 - Admissibility of electronic records.
+
+(1) Notwithstanding anything contained in this Act, any information contained in an electronic record which is printed on a paper, stored, recorded or copied in optical or magnetic media produced by a computer (hereinafter referred to as the computer output) shall be deemed to be also a document, if the conditions mentioned in this section are satisfied in relation to the information and computer in question and shall be admissible in any proceedings, without further proof or production of the original, as evidence or any contents of the original or of any fact stated therein of which direct evidence would be admissible.
+
+(2) The conditions referred to in sub-section (1) in respect of a computer output shall be the following, namely:
+(a) the computer output containing the information was produced by the computer during the period over which the computer was used regularly to store or process information for the purposes of any activities regularly carried on over that period by the person having lawful control over the use of the computer;
+(b) during the said period, information of the kind contained in the electronic record or of the kind from which the information so contained is derived was regularly fed into the computer in the ordinary course of the said activities;
+(c) throughout the material part of the said period, the computer was operating properly or, if not, then in respect of any period in which it was not operating properly or was out of operation during that part of the period, was not such as to affect the electronic record or the accuracy of its contents; and
+(d) the information contained in the electronic record reproduces or is derived from such information fed into the computer in the ordinary course of the said activities.
+
+(3) Where over any period, the function of storing or processing information for the purposes of any activities regularly carried on over that period as mentioned in clause (a) of sub-section (2) was regularly performed by computers, whether by a combination of computers operating over that period, or by different computers operating in succession over that period, or by different combinations of computers operating in succession over that period, or in any other manner involving the successive operation over that period, in whatever order, of one or more computers and one or more combinations of computers, all the computers used for that purpose during that period shall be treated for the purposes of this section as constituting a single computer.
+
+(4) In any proceedings where it is desired to give a statement in evidence by virtue of this section, a certificate doing any of the following things, that is to say:
+(a) identifying the electronic record containing the statement and describing the manner in which it was produced;
+(b) giving such particulars of any device involved in the production of that electronic record as may be appropriate for the purpose of showing that the electronic record was produced by a computer;
+(c) dealing with any of the matters to which the conditions mentioned in sub-section (2) relate,
+and purporting to be signed by a person occupying a responsible official position in relation to the operation of the relevant device or the management of the relevant activities (whichever is appropriate) shall be evidence of any matter stated in the certificate.
+
+(5) For the purposes of this section:
+(a) information shall be taken to be supplied to a computer if it is supplied thereto in any appropriate form and whether it is so supplied directly or (with or without human intervention) by means of any appropriate equipment;
+(b) a computer output shall be taken to have been produced by a computer whether it was produced by it directly or (with or without human intervention) by means of any appropriate equipment.
+
+This section is crucial for admitting phone call recordings, WhatsApp messages, emails, CCTV footage, and other electronic evidence in court proceedings."""
+        },
+        {
+            "section": "Section 65A",
+            "title": "Special provisions as to evidence relating to electronic record",
+            "content": """Section 65A of the Indian Evidence Act, 1872 - Special provisions as to evidence relating to electronic record.
+
+The contents of electronic records may be proved in accordance with the provisions of section 65B.
+
+This section establishes that electronic records are a valid form of evidence and their contents can be proved using the procedure laid down in Section 65B."""
+        },
+    ]
+    
+    documents = []
+    for idx, section in enumerate(sections):
+        content = f"""Indian Evidence Act, 1872 - {section['section']}
+
+{section['title'].upper()}
+
+{section['content']}
+
+Legal Reference: [Indian Evidence Act, 1872, {section['section']}]"""
+        
+        documents.append(Document(
+            page_content=content,
+            metadata={
+                "act_name": "Indian Evidence Act, 1872",
+                "section": section["section"],
+                "title": section["title"],
+                "source": "evidence_act_sections",
+                "index": idx
+            }
+        ))
+    
+    logger.info(f"Added {len(documents)} Evidence Act sections")
+    return documents
+
+
 def load_all_datasets() -> List[Document]:
     """Load all available datasets and combine them."""
     logger.info("=" * 60)
@@ -324,10 +442,19 @@ def load_all_datasets() -> List[Document]:
     # 2. Constitution articles
     all_documents.extend(get_constitution_articles())
     
-    # 3. viber1/indian-law-dataset
+    # 3. Load PDF documents (IPC, CrPC, CPC, Evidence Act)
+    try:
+        from scripts.load_pdf_documents import load_all_pdfs
+        pdf_docs = load_all_pdfs()
+        all_documents.extend(pdf_docs)
+        logger.info(f"Loaded {len(pdf_docs)} documents from PDFs")
+    except Exception as e:
+        logger.warning(f"Could not load PDF documents: {e}")
+    
+    # 4. viber1/indian-law-dataset
     all_documents.extend(load_viber1_dataset())
     
-    # 4. Try to load additional datasets
+    # 5. Try to load additional datasets
     try:
         all_documents.extend(load_ipc_dataset())
     except:

@@ -94,11 +94,19 @@ class VectorStoreManager:
             logger.info(f"Loading FAISS index from {self.index_path}")
             try:
                 from langchain_community.vectorstores import FAISS
-                self._faiss_store = FAISS.load_local(
-                    folder_path=str(self.index_path),
-                    embeddings=self.embeddings,
-                    allow_dangerous_deserialization=True
-                )
+                # Try with allow_dangerous_deserialization first (newer versions)
+                try:
+                    self._faiss_store = FAISS.load_local(
+                        folder_path=str(self.index_path),
+                        embeddings=self.embeddings,
+                        allow_dangerous_deserialization=True
+                    )
+                except TypeError:
+                    # Fall back for older langchain versions
+                    self._faiss_store = FAISS.load_local(
+                        folder_path=str(self.index_path),
+                        embeddings=self.embeddings
+                    )
                 self._initialized = True
                 logger.info("FAISS index loaded successfully")
                 return True
@@ -115,7 +123,7 @@ class VectorStoreManager:
         k: int = 5
     ) -> List[Document]:
         """
-        Perform similarity search.
+        Perform hybrid search (keyword + vector) for better retrieval.
         
         Args:
             query: Search query
@@ -135,15 +143,67 @@ class VectorStoreManager:
         if self._use_pgvector and self._check_pgvector_data():
             return pgvector_store.similarity_search(query, k)
         
-        # Use FAISS
+        # Use FAISS with hybrid approach
         if self._faiss_store:
-            logger.debug(f"Searching FAISS for: {query[:100]}...")
-            results = self._faiss_store.similarity_search(query, k=k)
-            logger.debug(f"Found {len(results)} results")
+            logger.debug(f"Hybrid search for: {query[:100]}...")
+            
+            # Step 1: Vector similarity search (get more candidates)
+            vector_results = self._faiss_store.similarity_search(query, k=k*2)
+            
+            # Step 2: Keyword boost - check for exact matches
+            query_lower = query.lower()
+            keywords = self._extract_keywords(query)
+            
+            # Score each result based on keyword matches
+            scored_results = []
+            for doc in vector_results:
+                content_lower = doc.page_content.lower()
+                metadata = doc.metadata
+                section = metadata.get('section') or ''  # Handle None
+                
+                # Calculate keyword match score
+                keyword_score = 0
+                for kw in keywords:
+                    if kw.lower() in content_lower:
+                        keyword_score += 2
+                    if section.lower().find(kw.lower()) >= 0:
+                        keyword_score += 3  # Boost for section match
+                
+                scored_results.append((doc, keyword_score))
+            
+            # Sort by keyword score (higher = better), keep top k
+            scored_results.sort(key=lambda x: x[1], reverse=True)
+            results = [doc for doc, score in scored_results[:k]]
+            
+            logger.debug(f"Hybrid search found {len(results)} results")
             return results
         
         logger.error("No vector store available for search")
         return []
+    
+    def _extract_keywords(self, query: str) -> List[str]:
+        """Extract important keywords from query for hybrid matching."""
+        # Common words to ignore
+        stopwords = {'what', 'is', 'the', 'a', 'an', 'of', 'in', 'for', 'to', 'as', 
+                     'can', 'i', 'do', 'how', 'under', 'about', 'with', 'are', 'be'}
+        
+        # Extract words
+        words = query.replace('?', '').replace('.', '').replace(',', '').split()
+        
+        # Filter and extract keywords
+        keywords = []
+        for word in words:
+            if word.lower() not in stopwords and len(word) > 2:
+                keywords.append(word)
+        
+        # Look for section/article patterns
+        import re
+        section_match = re.search(r'(?:section|article|sec\.?)\s*(\d+[A-Za-z]*)', query, re.IGNORECASE)
+        if section_match:
+            keywords.append(f"Section {section_match.group(1)}")
+            keywords.append(section_match.group(1))
+        
+        return keywords
     
     def similarity_search_with_score(
         self, 
