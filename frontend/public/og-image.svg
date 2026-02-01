@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0f1a"/>
+      <stop offset="100%" style="stop-color:#111827"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#26b8b8"/>
+      <stop offset="100%" style="stop-color:#22d3d3"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  
+  <!-- Decorative circles -->
+  <circle cx="1000" cy="100" r="200" fill="rgba(38,184,184,0.1)"/>
+  <circle cx="200" cy="530" r="150" fill="rgba(38,184,184,0.08)"/>
+  
+  <!-- Scale icon -->
+  <g transform="translate(100, 200)">
+    <path d="M60 30L30 60H90L60 30ZM60 20C61.1 20 62.1 20.4 62.9 21.2L97.9 56.2C99.3 57.6 100 59.3 100 61C100 64.3 97.3 67 94 67H26C22.7 67 20 64.3 20 61C20 59.3 20.7 57.6 22.1 56.2L57.1 21.2C57.9 20.4 58.9 20 60 20Z" fill="url(#accent)"/>
+    <rect x="55" y="67" width="10" height="30" fill="url(#accent)"/>
+    <rect x="30" y="97" width="60" height="8" rx="4" fill="url(#accent)"/>
+  </g>
+  
+  <!-- Main Title -->
+  <text x="220" y="260" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="white">LawGPT</text>
+  
+  <!-- Subtitle -->
+  <text x="220" y="320" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="rgba(255,255,255,0.8)">AI-Powered Legal Information Platform</text>
+  
+  <!-- Description -->
+  <text x="220" y="380" font-family="system-ui, -apple-system, sans-serif" font-size="22" fill="rgba(255,255,255,0.6)">Instant access to IPC, CrPC, Constitution of India</text>
+  <text x="220" y="415" font-family="system-ui, -apple-system, sans-serif" font-size="22" fill="rgba(255,255,255,0.6)">Know your legal rights • Free AI legal assistant</text>
+  
+  <!-- Domain -->
+  <text x="220" y="500" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="600" fill="#26b8b8">law-gpt.app</text>
+  
+  <!-- Badge -->
+  <rect x="220" y="530" width="120" height="36" rx="18" fill="rgba(38,184,184,0.2)" stroke="#26b8b8" stroke-width="1"/>
+  <text x="280" y="554" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="500" fill="#26b8b8" text-anchor="middle">Free Service</text>
+</svg>

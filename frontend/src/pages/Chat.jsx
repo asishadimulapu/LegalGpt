@@ -239,7 +239,8 @@ function Chat({ user, onLogout }) {
             let response;
 
             if (fileContent) {
-                response = await sendChatWithFile(query, fileContent, sessionId);
+                // Pass filename for chat history context
+                response = await sendChatWithFile(query, fileContent, sessionId, uploadedFile?.name);
             } else {
                 response = await sendChatMessage(query, sessionId);
             }
@@ -271,15 +272,18 @@ function Chat({ user, onLogout }) {
             }
 
         } catch (err) {
+            const errorMsg = typeof err === 'string'
+                ? err
+                : (err?.message || err?.detail || JSON.stringify(err) || 'An unexpected error occurred');
             const errorMessage = {
                 id: Date.now() + 1,
                 role: 'bot',
-                content: `I apologize, but I encountered an error: ${err.message}. Please try again.`,
+                content: `I apologize, but I encountered an error: ${errorMsg}. Please try again.`,
                 isFallback: true,
                 timestamp: getTimestamp(),
             };
             setMessages(prev => [...prev, errorMessage]);
-            setError(err.message);
+            setError(errorMsg);
         } finally {
             setIsLoading(false);
             inputRef.current?.focus();

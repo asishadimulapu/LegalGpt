@@ -2,12 +2,18 @@
 """
 Create, Read, Update, Delete operations for database models.
 Provides a clean abstraction layer over SQLAlchemy operations.
+
+PRODUCTION NOTES:
+- All write operations handle transactions explicitly
+- Rollback on failure to prevent connection state corruption
+- Flush before refresh to ensure database state is current
 """
 
 import uuid
 from datetime import datetime
 from typing import Optional, List
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy import desc
 import logging
 
@@ -27,7 +33,7 @@ class UserCRUD:
     @staticmethod
     def create(db: Session, user_data: UserCreate) -> User:
         """
-        Create a new user.
+        Create a new user with proper transaction handling.
         
         Args:
             db: Database session
@@ -35,28 +41,66 @@ class UserCRUD:
             
         Returns:
             User: Created user object
+            
+        Raises:
+            SQLAlchemyError: If database operation fails
         """
-        hashed_password = get_password_hash(user_data.password)
-        db_user = User(
-            email=user_data.email,
-            hashed_password=hashed_password,
-            full_name=user_data.full_name
-        )
-        db.add(db_user)
-        db.commit()
-        db.refresh(db_user)
-        logger.info(f"Created user: {db_user.email}")
-        return db_user
+        db_user = None
+        try:
+            hashed_password = get_password_hash(user_data.password)
+            db_user = User(
+                email=user_data.email,
+                hashed_password=hashed_password,
+                full_name=user_data.full_name
+            )
+            db.add(db_user)
+            db.flush()  # Flush to get ID without committing
+            db.refresh(db_user)  # Refresh to get DB-generated values
+            db.commit()
+            logger.info(f"Created user: {db_user.email}")
+            return db_user
+        except IntegrityError as e:
+            db.rollback()
+            logger.warning(f"User creation failed (duplicate): {user_data.email}")
+            raise
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"User creation failed: {e}")
+            raise
     
     @staticmethod
     def get_by_email(db: Session, email: str) -> Optional[User]:
-        """Get user by email address."""
-        return db.query(User).filter(User.email == email).first()
+        """
+        Get user by email address.
+        
+        Returns:
+            User if found, None if not found
+            
+        Raises:
+            SQLAlchemyError: If database query fails
+        """
+        try:
+            return db.query(User).filter(User.email == email).first()
+        except SQLAlchemyError as e:
+            logger.exception(f"Failed to get user by email '{email}': {e}")
+            raise
     
     @staticmethod
     def get_by_id(db: Session, user_id: uuid.UUID) -> Optional[User]:
-        """Get user by ID."""
-        return db.query(User).filter(User.id == user_id).first()
+        """
+        Get user by ID.
+        
+        Returns:
+            User if found, None if not found
+            
+        Raises:
+            SQLAlchemyError: If database query fails
+        """
+        try:
+            return db.query(User).filter(User.id == user_id).first()
+        except SQLAlchemyError as e:
+            logger.exception(f"Failed to get user by ID '{user_id}': {e}")
+            raise
     
     @staticmethod
     def authenticate(db: Session, email: str, password: str) -> Optional[User]:
@@ -75,11 +119,17 @@ class UserCRUD:
     
     @staticmethod
     def update_password(db: Session, user: User, new_password: str) -> User:
-        """Update user's password."""
-        user.hashed_password = get_password_hash(new_password)
-        db.commit()
-        db.refresh(user)
-        return user
+        """Update user's password with proper transaction handling."""
+        try:
+            user.hashed_password = get_password_hash(new_password)
+            db.flush()
+            db.commit()
+            db.refresh(user)
+            return user
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"Password update failed: {e}")
+            raise
 
 
 # =============================================================================
@@ -94,13 +144,24 @@ class ChatSessionCRUD:
         user_id: Optional[uuid.UUID] = None,
         title: str = "New Chat"
     ) -> ChatSession:
-        """Create a new chat session."""
+        """
+        Create a new chat session with proper transaction handling.
+        
+        Raises:
+            SQLAlchemyError: If database operation fails
+        """
         session = ChatSession(user_id=user_id, title=title)
-        db.add(session)
-        db.commit()
-        db.refresh(session)
-        logger.info(f"Created chat session: {session.id}")
-        return session
+        try:
+            db.add(session)
+            db.flush()
+            db.refresh(session)
+            db.commit()
+            logger.info(f"Created chat session: {session.id}")
+            return session
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"Failed to create chat session: {e}", exc_info=True)
+            raise
     
     @staticmethod
     def get_by_id(db: Session, session_id: uuid.UUID) -> Optional[ChatSession]:
@@ -130,19 +191,41 @@ class ChatSessionCRUD:
         session: ChatSession, 
         title: str
     ) -> ChatSession:
-        """Update session title."""
-        session.title = title
-        session.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(session)
-        return session
+        """
+        Update session title with proper transaction handling.
+        
+        Raises:
+            SQLAlchemyError: If database operation fails
+        """
+        try:
+            session.title = title
+            session.updated_at = datetime.utcnow()
+            db.flush()
+            db.commit()
+            db.refresh(session)
+            return session
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"Failed to update chat session title (id={session.id}): {e}", exc_info=True)
+            raise
     
     @staticmethod
     def delete(db: Session, session: ChatSession) -> None:
-        """Delete a chat session and all its messages."""
-        db.delete(session)
-        db.commit()
-        logger.info(f"Deleted chat session: {session.id}")
+        """
+        Delete a chat session and all its messages with proper transaction handling.
+        
+        Raises:
+            SQLAlchemyError: If database operation fails
+        """
+        session_id = session.id  # Capture before delete
+        try:
+            db.delete(session)
+            db.commit()
+            logger.info(f"Deleted chat session: {session_id}")
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"Failed to delete chat session (id={session_id}): {e}", exc_info=True)
+            raise
 
 
 # =============================================================================

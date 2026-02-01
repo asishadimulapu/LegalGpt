@@ -18,7 +18,7 @@ function Footer() {
                             <span className="footer-logo-icon">
                                 <Scale size={20} />
                             </span>
-                            <span className="footer-logo-text">NyayaSahay</span>
+                            <span className="footer-logo-text">LawGPT</span>
                         </div>
                         <p className="footer-tagline">
                             Empowering Indian citizens with AI-powered legal awareness.
@@ -33,41 +33,38 @@ function Footer() {
                     <div className="footer-links">
                         <h4>Quick Links</h4>
                         <ul>
-                            <li><Link to="/how-it-works">How It Works</Link></li>
-                            <li><Link to="/your-rights">Know Your Rights</Link></li>
-                            <li><Link to="/resources">IPC Sections</Link></li>
-                            <li><Link to="/resources">CrPC Guide</Link></li>
+                            <li><Link to="/about">About Us</Link></li>
+                            <li><Link to="/chat">Start Chat</Link></li>
                             <li><Link to="/faq">FAQs</Link></li>
+                            <li><Link to="/contact">Contact Us</Link></li>
                         </ul>
                     </div>
 
-                    {/* Resources */}
+                    {/* Legal */}
                     <div className="footer-links">
-                        <h4>Resources</h4>
+                        <h4>Legal</h4>
                         <ul>
-                            <li><Link to="/resources">Legal Dictionary</Link></li>
-                            <li><Link to="/resources">Case Studies</Link></li>
-                            <li><Link to="/resources">Rights During Arrest</Link></li>
-                            <li><Link to="/resources">Bail Information</Link></li>
-                            <li><Link to="/resources">Free Legal Aid</Link></li>
+                            <li><Link to="/privacy">Privacy Policy</Link></li>
+                            <li><Link to="/terms">Terms of Service</Link></li>
+                            <li><Link to="/disclaimer">Disclaimer</Link></li>
                         </ul>
                     </div>
 
                     {/* Contact */}
                     <div className="footer-links">
-                        <h4>Contact</h4>
+                        <h4>Get in Touch</h4>
                         <ul className="footer-contact">
                             <li>
                                 <Mail size={16} />
-                                <a href="mailto:help@nyayasahay.in">help@nyayasahay.in</a>
+                                <a href="mailto:support@law-gpt.app">support@law-gpt.app</a>
                             </li>
                             <li>
-                                <Phone size={16} />
-                                <span>1800 XXX XXXX (Toll Free)</span>
+                                <Mail size={16} />
+                                <a href="mailto:legal@law-gpt.app">legal@law-gpt.app</a>
                             </li>
                             <li>
                                 <MapPin size={16} />
-                                <span>New Delhi, India</span>
+                                <span>India</span>
                             </li>
                         </ul>
                     </div>
@@ -85,11 +82,12 @@ function Footer() {
 
                 {/* Bottom Bar */}
                 <div className="footer-bottom">
-                    <p>© 2026 NyayaSahay. All rights reserved.</p>
+                    <p>© 2026 LawGPT. All rights reserved.</p>
                     <div className="footer-bottom-links">
-                        <Link to="/privacy">Privacy Policy</Link>
-                        <Link to="/terms">Terms of Service</Link>
-                        <Link to="/accessibility">Accessibility</Link>
+                        <Link to="/privacy">Privacy</Link>
+                        <Link to="/terms">Terms</Link>
+                        <Link to="/contact">Contact</Link>
+                        <Link to="/faq">FAQ</Link>
                     </div>
                 </div>
             </div>

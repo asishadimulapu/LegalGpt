@@ -3,13 +3,15 @@
 JWT authentication and password hashing utilities.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
 from jose import jwt, JWTError
 import bcrypt
 import logging
+import re
+from typing import Tuple
 
 from app.config import settings
 
@@ -18,9 +20,39 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Password Hashing
 # =============================================================================
+def validate_password_strength(password: str) -> Tuple[bool, str]:
+    """
+    Validate password meets security requirements.
+    
+    Returns:
+        (is_valid, error_message)
+    """
+    if len(password) < settings.password_min_length:
+        return False, f"Password must be at least {settings.password_min_length} characters"
+    
+    if settings.password_require_uppercase and not re.search(r'[A-Z]', password):
+        return False, "Password must contain at least one uppercase letter"
+    
+    if settings.password_require_lowercase and not re.search(r'[a-z]', password):
+        return False, "Password must contain at least one lowercase letter"
+    
+    if settings.password_require_digit and not re.search(r'\d', password):
+        return False, "Password must contain at least one digit"
+    
+    if settings.password_require_special and not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        return False, "Password must contain at least one special character"
+    
+    # Check for common weak passwords
+    weak_passwords = ['password', '12345678', 'qwerty', 'abc123', 'password123']
+    if password.lower() in weak_passwords:
+        return False, "Password is too common. Please choose a stronger password."
+    
+    return True, ""
+
+
 def get_password_hash(password: str) -> str:
     """
-    Hash a password using bcrypt.
+    Hash a password using bcrypt with cost factor 12.
     
     Args:
         password: Plain text password
@@ -30,13 +62,14 @@ def get_password_hash(password: str) -> str:
         
     Viva Explanation:
     - BCrypt is a secure, slow hashing algorithm
+    - Cost factor 12 = 2^12 iterations (4096)
     - Automatically handles salting
     - Resistant to rainbow table attacks
     """
     # Encode password to bytes
     password_bytes = password.encode('utf-8')
-    # Generate salt and hash
-    salt = bcrypt.gensalt()
+    # Generate salt with cost factor 12 and hash
+    salt = bcrypt.gensalt(rounds=12)
     hashed = bcrypt.hashpw(password_bytes, salt)
     return hashed.decode('utf-8')
 
@@ -80,16 +113,16 @@ def create_access_token(
     - Self-contained: no database lookup needed for validation
     """
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(
+        expire = datetime.now(timezone.utc) + timedelta(
             minutes=settings.access_token_expire_minutes
         )
     
     to_encode = {
         "sub": str(subject),
         "exp": expire,
-        "iat": datetime.utcnow(),  # Issued at
+        "iat": datetime.now(timezone.utc),  # Issued at (timezone-aware)
         "type": "access"
     }
     

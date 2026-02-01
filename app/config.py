@@ -77,6 +77,30 @@ class Settings(BaseSettings):
     jwt_secret_key: str = ""  # Required: set in .env for production
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 7
+    
+    # -------------------------------------------------------------------------
+    # Encryption Configuration
+    # -------------------------------------------------------------------------
+    encryption_key: str = ""  # Required: for metadata encryption
+    api_signing_key: str = ""  # Required: for HMAC signatures
+    
+    # -------------------------------------------------------------------------
+    # Security Settings
+    # -------------------------------------------------------------------------
+    rate_limit_enabled: bool = True
+    rate_limit_per_minute: int = 100
+    rate_limit_burst: int = 20
+    enable_hsts: bool = True
+    enable_csp: bool = True
+    allowed_hosts: str = "law-gpt.app,localhost"
+    
+    # Password Policy
+    password_min_length: int = 12
+    password_require_uppercase: bool = True
+    password_require_lowercase: bool = True
+    password_require_digit: bool = True
+    password_require_special: bool = True
     
     @property
     def get_cors_origins(self) -> list:

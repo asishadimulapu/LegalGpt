@@ -50,7 +50,7 @@ function Header({ onAuthClick, user, onLogout }) {
                     <div className="logo-icon">
                         <Scale size={22} />
                     </div>
-                    <span className="logo-text">NyayaSahay</span>
+                    <span className="logo-text">LawGPT</span>
                 </Link>
 
                 {/* Navigation */}

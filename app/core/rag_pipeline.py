@@ -53,7 +53,9 @@ def get_llm():
         return ChatOpenAI(
             api_key=settings.openai_api_key,
             model="gpt-4-turbo-preview",
-            temperature=settings.llm_temperature
+            temperature=settings.llm_temperature,
+            timeout=30.0,
+            max_retries=2
         )
     
     elif settings.llm_provider == "gemini":
@@ -63,7 +65,9 @@ def get_llm():
         return ChatGoogleGenerativeAI(
             google_api_key=settings.google_api_key,
             model="gemini-1.5-flash",
-            temperature=settings.llm_temperature
+            temperature=settings.llm_temperature,
+            timeout=30.0,
+            max_retries=2
         )
     
     elif settings.llm_provider == "openrouter":
@@ -75,6 +79,8 @@ def get_llm():
             base_url="https://openrouter.ai/api/v1",
             model=settings.openrouter_model,
             temperature=settings.llm_temperature,
+            timeout=30.0,
+            max_retries=2,
             default_headers={
                 "HTTP-Referer": "http://localhost:8000",
                 "X-Title": "Indian Law RAG Chatbot"
@@ -89,7 +95,9 @@ def get_llm():
         return ChatGroq(
             api_key=settings.groq_api_key,
             model=settings.groq_model,
-            temperature=settings.llm_temperature
+            temperature=settings.llm_temperature,
+            timeout=30.0,
+            max_retries=2
         )
     
     else:

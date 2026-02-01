@@ -441,3 +441,187 @@ class DocumentEmbedding(Base):
     
     def __repr__(self) -> str:
         return f"<DocumentEmbedding(id={self.id}, source={self.source})>"
+
+
+# =============================================================================
+# Encrypted Data Storage Model
+# =============================================================================
+class EncryptedData(Base):
+    """
+    End-to-end encrypted data storage.
+    Server stores encrypted blobs without ability to decrypt user content.
+    
+    Viva Explanation:
+    - All sensitive user data stored encrypted
+    - Only user's device has decryption keys
+    - Server cannot read chat messages/queries
+    - Complies with zero-knowledge architecture
+    """
+    __tablename__ = "encrypted_data"
+    
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        comment="Unique encrypted data identifier"
+    )
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Owner of this encrypted data"
+    )
+    data_type = Column(
+        String(50),
+        nullable=False,
+        index=True,
+        comment="Type: chat_message, document, etc."
+    )
+    encrypted_content = Column(
+        Text,
+        nullable=False,
+        comment="Base64 AES-256-GCM ciphertext"
+    )
+    iv = Column(
+        String(255),
+        nullable=False,
+        comment="Initialization vector (base64)"
+    )
+    auth_tag = Column(
+        String(255),
+        nullable=False,
+        comment="GCM authentication tag (base64)"
+    )
+    algorithm = Column(
+        String(50),
+        default="AES-256-GCM",
+        nullable=False,
+        comment="Encryption algorithm"
+    )
+    key_version = Column(
+        Integer,
+        default=1,
+        nullable=False,
+        comment="Key version for rotation"
+    )
+    content_hash = Column(
+        String(64),
+        nullable=True,
+        index=True,
+        comment="HMAC hash for searching (no plaintext)"
+    )
+    metadata_encrypted = Column(
+        Text,
+        nullable=True,
+        comment="Encrypted metadata (Fernet)"
+    )
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+        index=True,
+        comment="Creation timestamp"
+    )
+    expires_at = Column(
+        DateTime,
+        nullable=True,
+        comment="Auto-deletion timestamp"
+    )
+    
+    # Relationship
+    user = relationship("User")
+    
+    # Indexes
+    __table_args__ = (
+        Index('idx_encrypted_data_user_type', 'user_id', 'data_type'),
+        Index('idx_encrypted_data_created', 'created_at'),
+        Index('idx_encrypted_data_expires', 'expires_at'),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<EncryptedData(id={self.id}, type={self.data_type})>"
+
+
+# =============================================================================
+# Audit Log Model (Security Events)
+# =============================================================================
+class AuditLog(Base):
+    """
+    Security audit log for compliance and threat detection.
+    Records authentication events, access attempts, and security violations.
+    """
+    __tablename__ = "audit_logs"
+    
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        comment="Unique audit log identifier"
+    )
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="User involved in event"
+    )
+    event_type = Column(
+        String(50),
+        nullable=False,
+        index=True,
+        comment="Event type: login, logout, failed_auth, etc."
+    )
+    event_category = Column(
+        String(50),
+        nullable=False,
+        index=True,
+        comment="Category: authentication, access_control, data_access"
+    )
+    severity = Column(
+        String(20),
+        nullable=False,
+        index=True,
+        comment="Severity: info, warning, critical"
+    )
+    ip_address = Column(
+        String(45),
+        nullable=True,
+        comment="IPv4/IPv6 address"
+    )
+    user_agent = Column(
+        Text,
+        nullable=True,
+        comment="User agent string"
+    )
+    details_encrypted = Column(
+        Text,
+        nullable=True,
+        comment="Encrypted event details (may contain sensitive info)"
+    )
+    success = Column(
+        Boolean,
+        default=True,
+        nullable=False,
+        comment="Whether action succeeded"
+    )
+    timestamp = Column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+        index=True,
+        comment="Event timestamp"
+    )
+    
+    # Relationship
+    user = relationship("User")
+    
+    # Indexes
+    __table_args__ = (
+        Index('idx_audit_logs_user_time', 'user_id', 'timestamp'),
+        Index('idx_audit_logs_type_time', 'event_type', 'timestamp'),
+        Index('idx_audit_logs_severity', 'severity', 'timestamp'),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<AuditLog(id={self.id}, type={self.event_type}, severity={self.severity})>"

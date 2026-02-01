@@ -1,6 +1,7 @@
 # Indian Law RAG Chatbot - Health Check Routes
 """
 Health check endpoints for monitoring application status.
+Includes connection pool monitoring for diagnosing DB starvation.
 """
 
 from fastapi import APIRouter, Depends
@@ -9,7 +10,7 @@ from typing import Dict, Any
 import logging
 
 from app.config import settings
-from app.db.database import check_db_connection
+from app.db.database import check_db_connection, engine
 from app.core.vector_store import get_vector_store, VectorStoreManager
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,21 @@ class ComponentStatus(BaseModel):
     message: str = ""
 
 
+def get_pool_status() -> Dict[str, Any]:
+    """
+    Get current connection pool status.
+    Useful for diagnosing connection starvation issues.
+    """
+    pool = engine.pool
+    return {
+        "pool_size": pool.size(),
+        "checked_out": pool.checkedout(),
+        "checked_in": pool.checkedin(),
+        "overflow": pool.overflow(),
+        "invalid": pool.invalidatedcount() if hasattr(pool, 'invalidatedcount') else 0,
+    }
+
+
 @router.get("/health", response_model=HealthResponse)
 async def health_check(
     vector_store: VectorStoreManager = Depends(get_vector_store)
@@ -40,6 +56,7 @@ async def health_check(
     
     Checks:
     - Database connection
+    - Connection pool status
     - FAISS vector store status
     - Overall application health
     
@@ -49,12 +66,20 @@ async def health_check(
     components = {}
     overall_healthy = True
     
-    # Check database connection
+    # Check database connection and pool status
     try:
         db_healthy = check_db_connection()
+        pool_status = get_pool_status()
+        
+        # Warn if pool is near exhaustion (>80% used)
+        pool_utilization = pool_status["checked_out"] / max(pool_status["pool_size"], 1)
+        pool_warning = pool_utilization > 0.8
+        
         components["database"] = {
             "status": "healthy" if db_healthy else "unhealthy",
-            "type": "postgresql"
+            "type": "postgresql",
+            "pool": pool_status,
+            "pool_warning": pool_warning
         }
         if not db_healthy:
             overall_healthy = False

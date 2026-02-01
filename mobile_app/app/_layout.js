@@ -31,23 +31,32 @@ function CustomDrawerContent(props) {
 
     // Reload user and sessions when drawer gains focus (fixes login state sync)
     useEffect(() => {
-        const unsubscribe = props.navigation.addListener('drawerOpen', () => {
-            loadUser();
+        const unsubscribeDrawer = props.navigation.addListener('drawerOpen', () => {
+            loadUserAndSessions();
         });
-        return unsubscribe;
+        // Also reload on screen focus (when navigating back from auth)
+        const unsubscribeFocus = props.navigation.addListener('state', () => {
+            loadUserAndSessions();
+        });
+        return () => {
+            unsubscribeDrawer();
+            unsubscribeFocus();
+        };
     }, [props.navigation]);
 
     useEffect(() => {
-        loadUser();
+        loadUserAndSessions();
     }, []);
 
-    useEffect(() => {
-        if (user) {
+    const loadUserAndSessions = async () => {
+        const userData = await getUser();
+        setUser(userData);
+        if (userData) {
             loadSessions();
         } else {
             setSessions([]);
         }
-    }, [user]);
+    };
 
     const loadUser = async () => {
         const userData = await getUser();
@@ -59,8 +68,8 @@ function CustomDrawerContent(props) {
         try {
             const sessionList = await getChatSessions();
             setSessions(sessionList.slice(0, 5)); // Show last 5
-        } catch (e) {
-            console.error(e);
+        } catch (_e) {
+            // Silent fail - sessions will remain empty
         } finally {
             setLoadingSessions(false);
         }
@@ -74,7 +83,7 @@ function CustomDrawerContent(props) {
     };
 
     const handleNewChat = () => {
-        router.push('/chat');
+        router.replace('/chat');
         props.navigation.closeDrawer();
     };
 
@@ -178,18 +187,44 @@ function CustomDrawerContent(props) {
 
             {/* Footer */}
             <View style={[styles.drawerFooter, { paddingBottom: insets.bottom + SPACING.md }]}>
-                <Pressable style={styles.footerLink} onPress={() => router.push('/about')}>
-                    <Feather name="info" size={18} color={COLORS.textLight} />
-                    <Text style={styles.footerLinkText}>About</Text>
-                </Pressable>
-                <Pressable style={styles.footerLink} onPress={() => router.push('/')}>
-                    <Feather name="home" size={18} color={COLORS.textLight} />
-                    <Text style={styles.footerLinkText}>Home</Text>
-                </Pressable>
+                <View style={styles.footerRow}>
+                    <Pressable style={styles.footerLink} onPress={() => router.push('/about')}>
+                        <Feather name="info" size={16} color={COLORS.textLight} />
+                        <Text style={styles.footerLinkText}>About</Text>
+                    </Pressable>
+                    <Pressable style={styles.footerLink} onPress={() => router.push('/faq')}>
+                        <Feather name="help-circle" size={16} color={COLORS.textLight} />
+                        <Text style={styles.footerLinkText}>FAQ</Text>
+                    </Pressable>
+                    <Pressable style={styles.footerLink} onPress={() => router.push('/contact')}>
+                        <Feather name="mail" size={16} color={COLORS.textLight} />
+                        <Text style={styles.footerLinkText}>Contact</Text>
+                    </Pressable>
+                </View>
+                <View style={styles.footerRow}>
+                    <Pressable style={styles.footerLink} onPress={() => router.push('/privacy')}>
+                        <Feather name="shield" size={16} color={COLORS.textLight} />
+                        <Text style={styles.footerLinkText}>Privacy</Text>
+                    </Pressable>
+                    <Pressable style={styles.footerLink} onPress={() => router.push('/terms')}>
+                        <Feather name="file-text" size={16} color={COLORS.textLight} />
+                        <Text style={styles.footerLinkText}>Terms</Text>
+                    </Pressable>
+                    <Pressable style={styles.footerLink} onPress={() => router.push('/disclaimer')}>
+                        <Feather name="alert-circle" size={16} color={COLORS.textLight} />
+                        <Text style={styles.footerLinkText}>Disclaimer</Text>
+                    </Pressable>
+                </View>
                 {user && (
                     <Pressable style={styles.logoutBtn} onPress={handleLogout}>
                         <Feather name="log-out" size={18} color={COLORS.errorRed} />
                         <Text style={styles.logoutBtnText}>Logout</Text>
+                    </Pressable>
+                )}
+                {!user && (
+                    <Pressable style={styles.loginBtn} onPress={() => { router.push('/auth'); props.navigation.closeDrawer(); }}>
+                        <Feather name="log-in" size={18} color={COLORS.primary} />
+                        <Text style={styles.loginBtnText}>Login / Register</Text>
                     </Pressable>
                 )}
             </View>
@@ -233,6 +268,11 @@ export default function RootLayout() {
                 <Drawer.Screen name="chat" options={{ drawerItemStyle: { display: 'none' } }} />
                 <Drawer.Screen name="about" options={{ drawerItemStyle: { display: 'none' } }} />
                 <Drawer.Screen name="auth" options={{ drawerItemStyle: { display: 'none' } }} />
+                <Drawer.Screen name="faq" options={{ drawerItemStyle: { display: 'none' } }} />
+                <Drawer.Screen name="privacy" options={{ drawerItemStyle: { display: 'none' } }} />
+                <Drawer.Screen name="terms" options={{ drawerItemStyle: { display: 'none' } }} />
+                <Drawer.Screen name="disclaimer" options={{ drawerItemStyle: { display: 'none' } }} />
+                <Drawer.Screen name="contact" options={{ drawerItemStyle: { display: 'none' } }} />
             </Drawer>
         </View>
     );
@@ -370,16 +410,20 @@ const styles = StyleSheet.create({
         borderTopColor: COLORS.whiteOverlay,
         gap: SPACING.sm,
     },
+    footerRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+    },
     footerLink: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.sm,
-        paddingVertical: 12,
-        paddingHorizontal: 14,
+        gap: SPACING.xs,
+        paddingVertical: 10,
+        paddingHorizontal: 8,
         borderRadius: RADIUS.md,
     },
     footerLinkText: {
-        fontSize: 15,
+        fontSize: 12,
         fontFamily: 'Inter_400Regular',
         color: COLORS.textLight,
     },
@@ -398,5 +442,21 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontFamily: 'Inter_400Regular',
         color: COLORS.errorRed,
+    },
+    loginBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.sm,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        borderRadius: RADIUS.md,
+        backgroundColor: COLORS.primaryTransparent,
+        borderWidth: 1,
+        borderColor: COLORS.primary,
+    },
+    loginBtnText: {
+        fontSize: 15,
+        fontFamily: 'Inter_500Medium',
+        color: COLORS.primary,
     },
 });

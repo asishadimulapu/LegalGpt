@@ -1,0 +1,16 @@
+# robots.txt for LawGPT
+
+# Allow all search engines
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://law-gpt.app/sitemap.xml
+
+# Disallow admin/private areas (if any)
+# User-agent: *
+# Disallow: /admin/
+# Disallow: /api/
+
+# Crawl delay (optional - helps prevent server overload)
+# Crawl-delay: 1

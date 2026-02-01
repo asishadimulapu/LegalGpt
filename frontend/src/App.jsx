@@ -15,6 +15,11 @@ import AuthModal from './components/AuthModal';
 import Landing from './pages/Landing';
 import Chat from './pages/Chat';
 import About from './pages/About';
+import Privacy from './pages/Privacy';
+import Terms from './pages/Terms';
+import Contact from './pages/Contact';
+import FAQ from './pages/FAQ';
+import Disclaimer from './pages/Disclaimer';
 
 // Services
 import { registerUser, loginUser } from './services/api';
@@ -93,6 +98,11 @@ function AppLayout() {
         <Route path="/" element={<Landing onTryNow={handleTryNow} onAuthClick={handleAuthClick} />} />
         <Route path="/chat" element={<Chat user={user} onAuthClick={handleAuthClick} onLogout={handleLogout} />} />
         <Route path="/about" element={<About />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/faq" element={<FAQ />} />
+        <Route path="/disclaimer" element={<Disclaimer />} />
         <Route path="/features" element={<Landing onTryNow={handleTryNow} onAuthClick={handleAuthClick} />} />
         <Route path="/how-it-works" element={<Landing onTryNow={handleTryNow} onAuthClick={handleAuthClick} />} />
         <Route path="/your-rights" element={<Landing onTryNow={handleTryNow} onAuthClick={handleAuthClick} />} />

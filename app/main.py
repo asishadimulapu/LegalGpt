@@ -128,14 +128,54 @@ app = FastAPI(
 # =============================================================================
 # Middleware Configuration
 # =============================================================================
+# Security Headers (OWASP compliance)
+from app.middleware.security_headers import SecurityHeadersMiddleware
+
+# Configure API origins for CSP connect-src
+# Add your production API domain and any other allowed origins
+csp_api_origins = ["https://law-gpt.app"]
+if settings.is_development:
+    csp_api_origins.extend([
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ])
+
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    enable_hsts=settings.enable_hsts,
+    enable_csp=settings.enable_csp,
+    api_origins=csp_api_origins
+)
+
+# Rate Limiting (DDoS protection)
+from app.middleware import RateLimitMiddleware
+app.add_middleware(
+    RateLimitMiddleware,
+    requests_per_minute=settings.rate_limit_per_minute,
+    burst_size=settings.rate_limit_burst,
+    enabled=settings.rate_limit_enabled
+)
+
 # CORS middleware for frontend integration
-# Security: Origins are configured based on environment
+# IMPORTANT: Must be added LAST so it runs FIRST (middleware stack is LIFO)
+# This ensures preflight OPTIONS requests are handled before other middleware
+cors_origins = settings.get_cors_origins  # Call the property to get the list
+if "*" not in cors_origins:
+    # Always allow localhost for development
+    cors_origins = list(set(cors_origins + [
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+    ]))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.get_cors_origins,  # Environment-based origins
+    allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Explicit methods
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["X-Response-Time-Ms"],
 )
 
 

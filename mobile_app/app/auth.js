@@ -73,15 +73,25 @@ export default function AuthScreen() {
         try {
             if (isSignIn) {
                 const response = await loginUser(formData.email, formData.password);
+                if (!response.access_token) {
+                    throw new Error('No access token received');
+                }
                 const userData = { email: formData.email, token: response.access_token };
                 await saveUser(userData);
+                // Small delay to ensure SecureStore write completes
+                await new Promise(resolve => setTimeout(resolve, 100));
                 router.replace('/chat');
             } else {
                 await registerUser(formData.name, formData.email, formData.password);
                 // Auto login after registration
                 const loginResponse = await loginUser(formData.email, formData.password);
+                if (!loginResponse.access_token) {
+                    throw new Error('No access token received');
+                }
                 const userData = { email: formData.email, name: formData.name, token: loginResponse.access_token };
                 await saveUser(userData);
+                // Small delay to ensure SecureStore write completes
+                await new Promise(resolve => setTimeout(resolve, 100));
                 router.replace('/chat');
             }
         } catch (err) {

@@ -3,7 +3,7 @@
  * Pixel-perfect replica of web Chat.jsx
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -16,15 +16,16 @@ import {
     ActivityIndicator,
     Alert,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useDrawerStatus } from '@react-navigation/drawer';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import * as DocumentPicker from 'expo-document-picker';
 
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
-import { sendChatMessage, checkHealth, getUser, clearUser } from '../services/api';
+import { sendChatMessage, checkHealth, getUser, clearUser, uploadFile, analyzeDocument, getChatSession } from '../services/api';
 import ChatBubble from '../components/ChatBubble';
 
 const EXAMPLE_QUERIES = [
@@ -48,19 +49,74 @@ export default function ChatScreen() {
     const [isBackendReady, setIsBackendReady] = useState(null);
     const [sessionId, setSessionId] = useState(null);
     const [user, setUser] = useState(null);
+    
+    // File upload state
+    const [uploadedFile, setUploadedFile] = useState(null);
+    const [fileContent, setFileContent] = useState(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadError, setUploadError] = useState(null);
 
     // Check backend health on mount
     useEffect(() => {
         checkBackendHealth();
-        loadUser();
     }, []);
+
+    // Reload user when screen gains focus (fixes login state after auth)
+    useFocusEffect(
+        useCallback(() => {
+            loadUser();
+        }, [])
+    );
+
+    // Handle session loading from params (clicking chat history)
+    useEffect(() => {
+        if (params.session && isBackendReady) {
+            loadSession(params.session);
+        } else if (!params.session) {
+            // New chat - clear everything
+            setMessages([]);
+            setSessionId(null);
+            setUploadedFile(null);
+            setFileContent(null);
+            setUploadError(null);
+        }
+    }, [params.session, isBackendReady]);
 
     // Handle query from params (quick questions)
     useEffect(() => {
-        if (params.query && isBackendReady) {
+        if (params.query && isBackendReady && !params.session) {
             setInputValue(decodeURIComponent(params.query));
         }
     }, [params.query, isBackendReady]);
+
+    const loadSession = async (sessionIdToLoad) => {
+        try {
+            setIsLoading(true);
+            const sessionData = await getChatSession(sessionIdToLoad);
+            setSessionId(sessionIdToLoad);
+            
+            // Convert session messages to display format
+            if (sessionData.messages && sessionData.messages.length > 0) {
+                const formattedMessages = sessionData.messages.map((msg, index) => ({
+                    id: msg.id || index,
+                    role: msg.role === 'user' ? 'user' : 'bot',
+                    content: msg.content,
+                    timestamp: new Date(msg.created_at).toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                    }),
+                    sources: msg.sources || [],
+                }));
+                setMessages(formattedMessages);
+            }
+        } catch (err) {
+            // Failed to load session - start fresh
+            setMessages([]);
+            setSessionId(null);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const checkBackendHealth = async () => {
         try {
@@ -100,13 +156,22 @@ export default function ChatScreen() {
             role: 'user',
             content: query,
             timestamp: getTimestamp(),
+            hasFile: !!uploadedFile,
+            fileName: uploadedFile?.name,
         };
         setMessages(prev => [...prev, userMessage]);
         setIsLoading(true);
         scrollToBottom();
 
         try {
-            const response = await sendChatMessage(query, sessionId);
+            let response;
+
+            if (fileContent) {
+                // Use document analysis for file-based queries
+                response = await analyzeDocument(fileContent, query, sessionId, uploadedFile?.name);
+            } else {
+                response = await sendChatMessage(query, sessionId);
+            }
 
             if (response.session_id) {
                 setSessionId(response.session_id);
@@ -120,8 +185,15 @@ export default function ChatScreen() {
                 isFallback: response.is_fallback || false,
                 latency: response.latency_ms,
                 timestamp: getTimestamp(),
+                basedOnFile: !!fileContent,
             };
             setMessages(prev => [...prev, botMessage]);
+
+            // Clear file after successful upload-based query
+            if (fileContent) {
+                setUploadedFile(null);
+                setFileContent(null);
+            }
         } catch (err) {
             const errorMessage = {
                 id: Date.now() + 1,
@@ -143,8 +215,65 @@ export default function ChatScreen() {
     };
 
     const handleNewChat = () => {
+        // Clear all state
         setMessages([]);
         setSessionId(null);
+        setUploadedFile(null);
+        setFileContent(null);
+        setUploadError(null);
+        setInputValue('');
+        // Navigate to chat without session param to trigger reset
+        router.replace('/chat');
+    };
+
+    // Handle file picking
+    const ALLOWED_FILE_TYPES = ['application/pdf', 'text/plain', 'application/msword', 
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+
+    const handleFilePick = async () => {
+        try {
+            const result = await DocumentPicker.getDocumentAsync({
+                type: ALLOWED_FILE_TYPES,
+                copyToCacheDirectory: true,
+            });
+
+            if (result.canceled) return;
+
+            const file = result.assets[0];
+            
+            // Check file size (10MB max)
+            if (file.size > 10 * 1024 * 1024) {
+                setUploadError('File too large. Maximum size: 10 MB');
+                return;
+            }
+
+            setUploadError(null);
+            setIsUploading(true);
+
+            try {
+                const response = await uploadFile(file);
+                setUploadedFile({
+                    name: response.filename || file.name,
+                    type: response.file_type || file.mimeType,
+                    size: file.size,
+                });
+                setFileContent(response.text_content);
+            } catch (err) {
+                setUploadError(err.message);
+                setUploadedFile(null);
+                setFileContent(null);
+            } finally {
+                setIsUploading(false);
+            }
+        } catch (err) {
+            setUploadError('Failed to pick file');
+        }
+    };
+
+    const handleRemoveFile = () => {
+        setUploadedFile(null);
+        setFileContent(null);
+        setUploadError(null);
     };
 
     const handleLogout = async () => {
@@ -204,9 +333,13 @@ export default function ChatScreen() {
                     <Pressable style={styles.newChatHeaderBtn} onPress={handleNewChat}>
                         <Ionicons name="add" size={22} color={COLORS.primary} />
                     </Pressable>
-                    {user && (
+                    {user ? (
                         <Pressable style={styles.logoutHeaderBtn} onPress={handleLogout}>
                             <Feather name="log-out" size={20} color={COLORS.errorRed} />
+                        </Pressable>
+                    ) : (
+                        <Pressable style={styles.loginHeaderBtn} onPress={() => router.push('/auth')}>
+                            <Feather name="user" size={20} color={COLORS.primary} />
                         </Pressable>
                     )}
                 </View>
@@ -292,11 +425,47 @@ export default function ChatScreen() {
 
             {/* Input Area */}
             <View style={[styles.inputArea, { paddingBottom: insets.bottom + SPACING.md }]}>
+                {/* File Preview */}
+                {uploadedFile && (
+                    <View style={styles.filePreview}>
+                        <Feather name="file-text" size={18} color={COLORS.primary} />
+                        <Text style={styles.fileName} numberOfLines={1}>{uploadedFile.name}</Text>
+                        <Pressable style={styles.removeFileBtn} onPress={handleRemoveFile}>
+                            <Feather name="x" size={18} color={COLORS.errorRed} />
+                        </Pressable>
+                    </View>
+                )}
+                
+                {/* Upload Error */}
+                {uploadError && (
+                    <View style={styles.uploadError}>
+                        <Feather name="alert-circle" size={14} color={COLORS.errorRed} />
+                        <Text style={styles.uploadErrorText}>{uploadError}</Text>
+                    </View>
+                )}
+                
+                {/* Uploading Indicator */}
+                {isUploading && (
+                    <View style={styles.uploadingIndicator}>
+                        <ActivityIndicator size="small" color={COLORS.primary} />
+                        <Text style={styles.uploadingText}>Uploading document...</Text>
+                    </View>
+                )}
+
                 <View style={styles.inputWrapper}>
+                    {/* Upload Button */}
+                    <Pressable
+                        style={[styles.uploadBtn, isUploading && styles.uploadBtnDisabled]}
+                        onPress={handleFilePick}
+                        disabled={isUploading || !isBackendReady}
+                    >
+                        <Feather name="paperclip" size={22} color={COLORS.textMuted} />
+                    </Pressable>
+                    
                     <TextInput
                         ref={inputRef}
                         style={styles.input}
-                        placeholder="Describe your legal situation..."
+                        placeholder={uploadedFile ? "Ask about this document..." : "Describe your legal situation..."}
                         placeholderTextColor={COLORS.textMuted}
                         value={inputValue}
                         onChangeText={setInputValue}
@@ -578,5 +747,72 @@ const styles = StyleSheet.create({
         padding: SPACING.sm,
         backgroundColor: COLORS.errorBg,
         borderRadius: RADIUS.md,
+    },
+    loginHeaderBtn: {
+        padding: SPACING.sm,
+        backgroundColor: COLORS.primaryTransparent,
+        borderRadius: RADIUS.md,
+    },
+    
+    // File Upload
+    filePreview: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.sm,
+        backgroundColor: COLORS.primaryTransparent,
+        paddingHorizontal: SPACING.md,
+        paddingVertical: SPACING.sm,
+        borderRadius: RADIUS.md,
+        marginBottom: SPACING.sm,
+    },
+    fileName: {
+        flex: 1,
+        fontSize: 14,
+        fontFamily: 'Inter_500Medium',
+        color: COLORS.primary,
+    },
+    removeFileBtn: {
+        padding: SPACING.xs,
+    },
+    uploadError: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.sm,
+        backgroundColor: COLORS.errorBg,
+        paddingHorizontal: SPACING.md,
+        paddingVertical: SPACING.sm,
+        borderRadius: RADIUS.md,
+        marginBottom: SPACING.sm,
+    },
+    uploadErrorText: {
+        flex: 1,
+        fontSize: 13,
+        fontFamily: 'Inter_400Regular',
+        color: COLORS.errorRed,
+    },
+    uploadingIndicator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.sm,
+        paddingVertical: SPACING.sm,
+        marginBottom: SPACING.sm,
+    },
+    uploadingText: {
+        fontSize: 13,
+        fontFamily: 'Inter_400Regular',
+        color: COLORS.textMuted,
+    },
+    uploadBtn: {
+        width: 44,
+        height: 50,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: COLORS.lightBg,
+        borderRadius: RADIUS.md,
+        borderWidth: 1,
+        borderColor: COLORS.borderColor,
+    },
+    uploadBtnDisabled: {
+        opacity: 0.5,
     },
 });

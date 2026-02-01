@@ -1,9 +1,13 @@
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-package-lock.json
+# ===========================
+# SECURITY - NEVER COMMIT THESE
+# ===========================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+keys/
+secrets/
 
 # Python
 __pycache__/
@@ -11,42 +15,42 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
 venv/
+env/
+.venv/
 ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
+dist/
+build/
 *.egg
 
-# Environment
-.env
-.venv
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+test.db
+*.test.*
+*.spec.*
 
-# IDEs
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# Data & Models
-data/
-models/
-*.db
-*.sqlite
-chroma_db/
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+.npm/
+
+# Expo / React Native
+.expo/
+*.jks
+*.p8
+*.p12
+*.mobileprovision
 
 # Logs
 logs/
@@ -56,10 +60,15 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Jupyter
-.ipynb_checkpoints/
+# Build outputs
+frontend/dist/
+*.pyc
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
+# Database
+*.sqlite3
+*.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp

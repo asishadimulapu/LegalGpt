@@ -44,8 +44,30 @@ function AuthModal({ isOpen, mode, onClose, onSubmit, onSwitchMode }) {
                 setError('Passwords do not match');
                 return;
             }
-            if (formData.password.length < 6) {
-                setError('Password must be at least 6 characters');
+            // TODO: Fetch password requirements from backend API (GET /api/v1/auth/password-requirements)
+            // or import from a shared config file. The value 12 should match:
+            // Backend: app/config.py -> password_min_length setting
+            // This hardcoded value can drift from backend settings.
+            // Consider: const { minLength } = await fetchPasswordRequirements();
+            const PASSWORD_MIN_LENGTH = 12; // Sync with app/config.py:password_min_length
+            if (formData.password.length < PASSWORD_MIN_LENGTH) {
+                setError(`Password must be at least ${PASSWORD_MIN_LENGTH} characters`);
+                return;
+            }
+            if (!/[A-Z]/.test(formData.password)) {
+                setError('Password must contain at least one uppercase letter');
+                return;
+            }
+            if (!/[a-z]/.test(formData.password)) {
+                setError('Password must contain at least one lowercase letter');
+                return;
+            }
+            if (!/\d/.test(formData.password)) {
+                setError('Password must contain at least one number');
+                return;
+            }
+            if (!/[!@#$%^&*(),.?":{}|<>]/.test(formData.password)) {
+                setError('Password must contain at least one special character (!@#$%^&*...)');
                 return;
             }
         }
@@ -113,6 +135,9 @@ function AuthModal({ isOpen, mode, onClose, onSubmit, onSwitchMode }) {
                             value={formData.email}
                             onChange={handleChange}
                             placeholder="Enter your email"
+                            autoComplete="email"
+                            aria-required="true"
+                            aria-label="Email address"
                         />
                     </div>
 
@@ -128,6 +153,9 @@ function AuthModal({ isOpen, mode, onClose, onSubmit, onSwitchMode }) {
                                 value={formData.password}
                                 onChange={handleChange}
                                 placeholder="Enter your password"
+                                autoComplete={isSignIn ? "current-password" : "new-password"}
+                                aria-required="true"
+                                aria-label="Password"
                             />
                             <button
                                 type="button"
@@ -137,6 +165,11 @@ function AuthModal({ isOpen, mode, onClose, onSubmit, onSwitchMode }) {
                                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                             </button>
                         </div>
+                        {!isSignIn && (
+                            <small className="password-hint">
+                                Password must be at least 12 characters and include uppercase, lowercase, number, and special character
+                            </small>
+                        )}
                     </div>
 
                     {!isSignIn && (

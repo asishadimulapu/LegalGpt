@@ -4,7 +4,8 @@
  */
 
 // Use environment variable in production, fallback to localhost for development
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
+    (import.meta.env.PROD ? '' : 'http://localhost:8000');
 
 
 /**
@@ -255,40 +256,84 @@ export async function uploadFile(file) {
         throw error;
     }
 }
-
 /**
- * Send a chat query with file context
+ * Send a chat query with file context using hybrid document analysis endpoint
+ * This combines document analysis with RAG retrieval for mentioned sections
+ * Now includes session_id and document_filename for chat history saving
  */
-export async function sendChatWithFile(query, fileContext, sessionId = null) {
-    try {
-        // Prepend file context to query
-        const enhancedQuery = `Based on the following uploaded document content, please answer this question: ${query}\n\n--- UPLOADED DOCUMENT ---\n${fileContext.substring(0, 8000)}\n--- END DOCUMENT ---`;
+export async function sendChatWithFile(query, fileContext, sessionId = null, documentFilename = null) {
+    // Create abort controller with 120 second timeout for document analysis
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
 
-        const response = await fetch(`${API_BASE_URL}/api/v1/chat`, {
+    try {
+        // Build request body with optional session_id and document_filename
+        const requestBody = {
+            document_content: fileContext,
+            question: query,
+        };
+        
+        if (sessionId) {
+            requestBody.session_id = sessionId;
+        }
+        if (documentFilename) {
+            requestBody.document_filename = documentFilename;
+        }
+
+        // Use the hybrid document analysis endpoint
+        const response = await fetch(`${API_BASE_URL}/api/v1/upload/analyze`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 ...getAuthHeaders(),
             },
-            body: JSON.stringify({
-                query: enhancedQuery,
-                session_id: sessionId,
-            }),
+            body: JSON.stringify(requestBody),
+            signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.detail || `Server error: ${response.status}`);
         }
 
-        return await response.json();
+        const data = await response.json();
+
+        // Build answer with legal context if available
+        let enhancedAnswer = data.answer;
+
+        if (data.legal_context && data.legal_context.length > 0) {
+            enhancedAnswer += '\n\n---\n\n**📚 Related Legal Provisions (from RAG Database):**\n';
+            data.legal_context.forEach(ctx => {
+                enhancedAnswer += `\n**Section ${ctx.section}** (${ctx.source}):\n${ctx.content}\n`;
+            });
+        }
+
+        // Transform response to match chat response format
+        // Use the session_id from response (backend creates session if authenticated)
+        return {
+            answer: enhancedAnswer,
+            sources: data.sources || [],
+            session_id: data.session_id || sessionId,  // Use new session_id from backend
+            is_fallback: false,
+            latency_ms: data.latency_ms,
+            document_type: data.document_type,
+            extracted_sections: data.extracted_sections
+        };
     } catch (error) {
+        clearTimeout(timeoutId);
+
+        if (error.name === 'AbortError') {
+            throw new Error('Document analysis timed out. The server may be busy. Please try again.');
+        }
         if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
             throw new Error('Unable to connect to the server. Please ensure the backend is running.');
         }
         throw error;
     }
 }
+
 
 export default {
     sendChatMessage,
