@@ -1,6 +1,6 @@
 /**
  * NyayaSahay Mobile - Chat Screen
- * Pixel-perfect replica of web Chat.jsx
+ * Pixel-perfect replica of web Chat.jsx with responsive design
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -25,8 +25,10 @@ import { useNavigation } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
+import { wp, hp, ms, screenSize } from '../constants/responsive';
 import { sendChatMessage, checkHealth, getUser, clearUser, uploadFile, analyzeDocument, getChatSession } from '../services/api';
 import ChatBubble from '../components/ChatBubble';
+
 
 const EXAMPLE_QUERIES = [
     "What is Section 302 of IPC?",
@@ -49,7 +51,7 @@ export default function ChatScreen() {
     const [isBackendReady, setIsBackendReady] = useState(null);
     const [sessionId, setSessionId] = useState(null);
     const [user, setUser] = useState(null);
-    
+
     // File upload state
     const [uploadedFile, setUploadedFile] = useState(null);
     const [fileContent, setFileContent] = useState(null);
@@ -94,7 +96,7 @@ export default function ChatScreen() {
             setIsLoading(true);
             const sessionData = await getChatSession(sessionIdToLoad);
             setSessionId(sessionIdToLoad);
-            
+
             // Convert session messages to display format
             if (sessionData.messages && sessionData.messages.length > 0) {
                 const formattedMessages = sessionData.messages.map((msg, index) => ({
@@ -227,7 +229,7 @@ export default function ChatScreen() {
     };
 
     // Handle file picking
-    const ALLOWED_FILE_TYPES = ['application/pdf', 'text/plain', 'application/msword', 
+    const ALLOWED_FILE_TYPES = ['application/pdf', 'text/plain', 'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
 
     const handleFilePick = async () => {
@@ -240,7 +242,7 @@ export default function ChatScreen() {
             if (result.canceled) return;
 
             const file = result.assets[0];
-            
+
             // Check file size (10MB max)
             if (file.size > 10 * 1024 * 1024) {
                 setUploadError('File too large. Maximum size: 10 MB');
@@ -435,7 +437,7 @@ export default function ChatScreen() {
                         </Pressable>
                     </View>
                 )}
-                
+
                 {/* Upload Error */}
                 {uploadError && (
                     <View style={styles.uploadError}>
@@ -443,7 +445,7 @@ export default function ChatScreen() {
                         <Text style={styles.uploadErrorText}>{uploadError}</Text>
                     </View>
                 )}
-                
+
                 {/* Uploading Indicator */}
                 {isUploading && (
                     <View style={styles.uploadingIndicator}>
@@ -461,7 +463,7 @@ export default function ChatScreen() {
                     >
                         <Feather name="paperclip" size={22} color={COLORS.textMuted} />
                     </Pressable>
-                    
+
                     <TextInput
                         ref={inputRef}
                         style={styles.input}
@@ -505,10 +507,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: 'white',
-        gap: SPACING.md,
+        gap: ms(14),
     },
     loadingText: {
-        fontSize: 16,
+        fontSize: ms(15),
         fontFamily: 'Inter_400Regular',
         color: COLORS.textMuted,
     },
@@ -517,52 +519,52 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: SPACING.md,
-        paddingBottom: SPACING.md,
+        paddingHorizontal: ms(14),
+        paddingBottom: ms(12),
         borderBottomWidth: 1,
         borderBottomColor: COLORS.borderColor,
         backgroundColor: 'white',
     },
     menuBtn: {
-        padding: SPACING.sm,
-        marginRight: SPACING.sm,
+        padding: ms(8),
+        marginRight: ms(6),
     },
     headerInfo: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.md,
+        gap: ms(12),
     },
     headerAvatar: {
-        width: 45,
-        height: 45,
+        width: ms(42),
+        height: ms(42),
         borderRadius: RADIUS.md,
         backgroundColor: COLORS.primary,
         alignItems: 'center',
         justifyContent: 'center',
     },
     headerTitle: {
-        fontSize: 17,
+        fontSize: ms(16),
         fontFamily: 'Inter_600SemiBold',
         color: COLORS.textDark,
     },
     statusBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: ms(5),
         marginTop: 2,
     },
     statusDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
+        width: ms(7),
+        height: ms(7),
+        borderRadius: ms(4),
     },
     statusText: {
-        fontSize: 13,
+        fontSize: ms(12),
         fontFamily: 'Inter_400Regular',
     },
     newChatHeaderBtn: {
-        padding: SPACING.sm,
+        padding: ms(8),
         backgroundColor: COLORS.primaryTransparent,
         borderRadius: RADIUS.md,
     },
@@ -573,61 +575,61 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.lightBg,
     },
     messagesContent: {
-        padding: SPACING.lg,
-        paddingBottom: SPACING.xl,
+        padding: ms(18),
+        paddingBottom: ms(24),
     },
 
     // Empty State
     emptyState: {
         alignItems: 'center',
-        paddingTop: SPACING.xxxl,
+        paddingTop: ms(50),
     },
     emptyIcon: {
-        width: 80,
-        height: 80,
+        width: ms(70),
+        height: ms(70),
         borderRadius: RADIUS.xl,
         backgroundColor: COLORS.primary,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: SPACING.lg,
+        marginBottom: ms(18),
     },
     emptyTitle: {
-        fontSize: 22,
+        fontSize: ms(20),
         fontFamily: 'Inter_700Bold',
         color: COLORS.darkSurface,
-        marginBottom: SPACING.sm,
+        marginBottom: ms(6),
     },
     emptySubtitle: {
-        fontSize: 15,
+        fontSize: ms(14),
         fontFamily: 'Inter_400Regular',
         color: COLORS.textMuted,
         textAlign: 'center',
-        marginBottom: SPACING.xs,
+        marginBottom: ms(4),
     },
     emptyHint: {
-        fontSize: 14,
+        fontSize: ms(13),
         fontFamily: 'Inter_400Regular',
         color: COLORS.textMuted,
         textAlign: 'center',
-        marginBottom: SPACING.xl,
+        marginBottom: ms(24),
     },
     exampleCards: {
         width: '100%',
-        gap: SPACING.sm,
+        gap: ms(8),
     },
     exampleCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.sm,
+        gap: ms(8),
         backgroundColor: 'white',
-        padding: SPACING.md,
+        padding: ms(14),
         borderRadius: RADIUS.md,
         borderWidth: 1,
         borderColor: COLORS.borderColor,
     },
     exampleCardText: {
         flex: 1,
-        fontSize: 14,
+        fontSize: ms(13),
         fontFamily: 'Inter_400Regular',
         color: COLORS.textDark,
     },
@@ -636,12 +638,12 @@ const styles = StyleSheet.create({
     typingIndicator: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        gap: SPACING.md,
-        marginTop: SPACING.md,
+        gap: ms(12),
+        marginTop: ms(12),
     },
     typingAvatar: {
-        width: 36,
-        height: 36,
+        width: ms(34),
+        height: ms(34),
         borderRadius: RADIUS.md,
         backgroundColor: COLORS.primary,
         alignItems: 'center',
@@ -650,29 +652,29 @@ const styles = StyleSheet.create({
     typingBubble: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.md,
+        gap: ms(12),
         backgroundColor: 'white',
-        paddingHorizontal: SPACING.lg,
-        paddingVertical: SPACING.md,
+        paddingHorizontal: ms(18),
+        paddingVertical: ms(12),
         borderRadius: RADIUS.lg,
         borderBottomLeftRadius: RADIUS.sm,
         ...SHADOWS.sm,
     },
     typingDots: {
         flexDirection: 'row',
-        gap: 4,
+        gap: ms(4),
     },
     dot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
+        width: ms(7),
+        height: ms(7),
+        borderRadius: ms(4),
         backgroundColor: COLORS.primary,
     },
     dot1: { opacity: 0.4 },
     dot2: { opacity: 0.7 },
     dot3: { opacity: 1 },
     typingText: {
-        fontSize: 14,
+        fontSize: ms(13),
         fontFamily: 'Inter_400Regular',
         color: COLORS.textMuted,
     },
@@ -681,22 +683,22 @@ const styles = StyleSheet.create({
     backendError: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.sm,
-        paddingHorizontal: SPACING.xl,
-        paddingVertical: SPACING.md,
+        gap: ms(8),
+        paddingHorizontal: ms(24),
+        paddingVertical: ms(12),
         backgroundColor: COLORS.errorBg,
     },
     backendErrorText: {
         flex: 1,
-        fontSize: 13,
+        fontSize: ms(12),
         fontFamily: 'Inter_400Regular',
         color: COLORS.errorRed,
     },
 
     // Input Area
     inputArea: {
-        paddingHorizontal: SPACING.lg,
-        paddingTop: SPACING.md,
+        paddingHorizontal: ms(18),
+        paddingTop: ms(12),
         backgroundColor: 'white',
         borderTopWidth: 1,
         borderTopColor: COLORS.borderColor,
@@ -704,25 +706,25 @@ const styles = StyleSheet.create({
     inputWrapper: {
         flexDirection: 'row',
         alignItems: 'flex-end',
-        gap: SPACING.sm,
+        gap: ms(8),
     },
     input: {
         flex: 1,
-        minHeight: 50,
-        maxHeight: 150,
-        paddingHorizontal: 18,
-        paddingVertical: 14,
+        minHeight: ms(46),
+        maxHeight: ms(130),
+        paddingHorizontal: ms(16),
+        paddingVertical: ms(12),
         backgroundColor: 'white',
         borderWidth: 2,
         borderColor: COLORS.borderColor,
         borderRadius: RADIUS.lg,
-        fontSize: 16,
+        fontSize: ms(15),
         fontFamily: 'Inter_400Regular',
         color: COLORS.textDark,
     },
     sendBtn: {
-        width: 50,
-        height: 50,
+        width: ms(46),
+        height: ms(46),
         backgroundColor: COLORS.primary,
         borderRadius: RADIUS.lg,
         alignItems: 'center',
@@ -732,79 +734,79 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.borderColor,
     },
     disclaimer: {
-        fontSize: 12,
+        fontSize: ms(11),
         fontFamily: 'Inter_400Regular',
         color: COLORS.textMuted,
         textAlign: 'center',
-        marginTop: SPACING.sm,
+        marginTop: ms(8),
     },
     headerActions: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.sm,
+        gap: ms(8),
     },
     logoutHeaderBtn: {
-        padding: SPACING.sm,
+        padding: ms(8),
         backgroundColor: COLORS.errorBg,
         borderRadius: RADIUS.md,
     },
     loginHeaderBtn: {
-        padding: SPACING.sm,
+        padding: ms(8),
         backgroundColor: COLORS.primaryTransparent,
         borderRadius: RADIUS.md,
     },
-    
+
     // File Upload
     filePreview: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.sm,
+        gap: ms(8),
         backgroundColor: COLORS.primaryTransparent,
-        paddingHorizontal: SPACING.md,
-        paddingVertical: SPACING.sm,
+        paddingHorizontal: ms(14),
+        paddingVertical: ms(8),
         borderRadius: RADIUS.md,
-        marginBottom: SPACING.sm,
+        marginBottom: ms(8),
     },
     fileName: {
         flex: 1,
-        fontSize: 14,
+        fontSize: ms(13),
         fontFamily: 'Inter_500Medium',
         color: COLORS.primary,
     },
     removeFileBtn: {
-        padding: SPACING.xs,
+        padding: ms(4),
     },
     uploadError: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.sm,
+        gap: ms(8),
         backgroundColor: COLORS.errorBg,
-        paddingHorizontal: SPACING.md,
-        paddingVertical: SPACING.sm,
+        paddingHorizontal: ms(14),
+        paddingVertical: ms(8),
         borderRadius: RADIUS.md,
-        marginBottom: SPACING.sm,
+        marginBottom: ms(8),
     },
     uploadErrorText: {
         flex: 1,
-        fontSize: 13,
+        fontSize: ms(12),
         fontFamily: 'Inter_400Regular',
         color: COLORS.errorRed,
     },
     uploadingIndicator: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.sm,
-        paddingVertical: SPACING.sm,
-        marginBottom: SPACING.sm,
+        gap: ms(8),
+        paddingVertical: ms(8),
+        marginBottom: ms(8),
     },
     uploadingText: {
-        fontSize: 13,
+        fontSize: ms(12),
         fontFamily: 'Inter_400Regular',
         color: COLORS.textMuted,
     },
     uploadBtn: {
-        width: 44,
-        height: 50,
+        width: ms(42),
+        height: ms(46),
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: COLORS.lightBg,
@@ -816,3 +818,4 @@ const styles = StyleSheet.create({
         opacity: 0.5,
     },
 });
+

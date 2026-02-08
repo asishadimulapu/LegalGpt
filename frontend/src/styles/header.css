@@ -129,6 +129,28 @@
     transform: translateY(-1px);
 }
 
+.btn-chat {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: 10px 20px;
+    background: linear-gradient(135deg, var(--primary) 0%, #0d9488 100%);
+    border: none;
+    border-radius: var(--radius-md);
+    color: white;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3);
+}
+
+.btn-chat:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.4);
+}
+
 /* Mobile Menu Toggle */
 .mobile-menu-toggle {
     display: none;

@@ -4,7 +4,7 @@
  */
 
 // Use environment variable in production, fallback to localhost for development
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
     (import.meta.env.PROD ? '' : 'http://localhost:8000');
 
 
@@ -20,6 +20,26 @@ function getAuthHeaders() {
         }
     }
     return {};
+}
+
+/**
+ * Validate if the stored token is still valid
+ * Returns false if token is expired or invalid
+ */
+export async function validateToken(token) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+
+        return response.ok; // true if 200, false if 401
+    } catch (error) {
+        return false;
+    }
 }
 
 /**
@@ -272,7 +292,7 @@ export async function sendChatWithFile(query, fileContext, sessionId = null, doc
             document_content: fileContext,
             question: query,
         };
-        
+
         if (sessionId) {
             requestBody.session_id = sessionId;
         }
@@ -345,4 +365,5 @@ export default {
     getChatSessions,
     getChatSession,
     deleteChatSession,
+    validateToken,
 };

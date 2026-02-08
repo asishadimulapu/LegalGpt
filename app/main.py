@@ -63,6 +63,14 @@ async def lifespan(app: FastAPI):
         logger.error(f"✗ Database initialization failed: {e}")
         # Continue anyway - database might just need connection
     
+    # Pre-warm embedding model for faster first queries
+    try:
+        from app.core.embeddings import embedding_generator
+        embedding_generator.warmup()
+        logger.info("✓ Embedding model warmed up")
+    except Exception as e:
+        logger.warning(f"⚠ Embedding warmup failed (will load on first query): {e}")
+    
     # Load vector store
     # NOTE: Disabled for deployment speed. Lazy loading implemented in vector_store.py
     # try:

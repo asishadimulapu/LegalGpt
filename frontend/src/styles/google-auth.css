@@ -1,0 +1,98 @@
+/**
+ * Google OAuth Styles - Teal Theme
+ */
+
+.google-auth-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 48px;
+    box-shadow: 0 4px 14px rgba(13, 148, 136, 0.3);
+}
+
+.google-auth-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(13, 148, 136, 0.4);
+}
+
+.google-auth-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.google-auth-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.google-auth-btn.loading {
+    background: #f8f9fa;
+}
+
+.google-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #dadce0;
+    border-top-color: #4285f4;
+    border-radius: 50%;
+    animation: google-spin 0.8s linear infinite;
+}
+
+@keyframes google-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Divider with "or" text */
+.auth-divider {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 20px 0;
+    color: #80868b;
+    font-size: 13px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #dadce0;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .google-auth-btn {
+        background: #2d2d2d;
+        border-color: #5f6368;
+        color: #e8eaed;
+    }
+
+    .google-auth-btn:hover:not(:disabled) {
+        background: #3c3c3c;
+        border-color: #8ab4f8;
+    }
+
+    .auth-divider {
+        color: #9aa0a6;
+    }
+
+    .auth-divider::before,
+    .auth-divider::after {
+        background: #5f6368;
+    }
+}

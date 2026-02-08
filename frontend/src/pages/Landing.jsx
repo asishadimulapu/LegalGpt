@@ -26,7 +26,8 @@ import {
     Sparkles,
     Send,
     ArrowRight,
-    Rocket
+    Rocket,
+    MessageCircle
 } from 'lucide-react';
 import '../styles/landing.css';
 
@@ -189,7 +190,7 @@ function Landing({ onTryNow, onAuthClick }) {
                                 className="btn btn-primary hero-cta animate-pulse-glow"
                                 onClick={handleStartChat}
                             >
-                                Start Free Consultation <ArrowRight size={18} />
+                                <MessageCircle size={18} /> Start Free Consultation <ArrowRight size={18} />
                             </button>
                             <button
                                 className="btn btn-outline hero-cta-secondary"

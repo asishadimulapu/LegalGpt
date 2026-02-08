@@ -1,6 +1,6 @@
 /**
  * NyayaSahay Mobile - Landing Screen
- * Professional swipeable pages layout
+ * Professional swipeable pages layout with responsive design
  */
 
 import { useState, useRef } from 'react';
@@ -12,6 +12,7 @@ import {
     Pressable,
     FlatList,
     Animated,
+    useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,10 +24,10 @@ import {
 } from '@expo/vector-icons';
 
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+import { wp, hp, ms, screenSize } from '../constants/responsive';
 
 // Page data
+
 const PAGES = [
     {
         id: 'hero',
@@ -93,6 +94,7 @@ export default function LandingScreen() {
     const insets = useSafeAreaInsets();
     const flatListRef = useRef(null);
     const [currentPage, setCurrentPage] = useState(0);
+    const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
     const handleStartChat = () => {
         router.push('/chat');
@@ -119,10 +121,12 @@ export default function LandingScreen() {
     }).current;
 
     const renderPage = ({ item, index }) => {
+        const pageStyle = { width: screenWidth, paddingHorizontal: ms(16), justifyContent: 'center' };
+
         switch (item.type) {
             case 'hero':
                 return (
-                    <View style={[styles.page, styles.heroPage]}>
+                    <View style={[pageStyle, styles.heroPage]}>
                         <View style={styles.heroBadge}>
                             <Ionicons name="sparkles" size={14} color={COLORS.primary} />
                             <Text style={styles.heroBadgeText}>AI-Powered Legal Assistant</Text>
@@ -145,7 +149,7 @@ export default function LandingScreen() {
 
             case 'features':
                 return (
-                    <View style={[styles.page, styles.featuresPage]}>
+                    <View style={[pageStyle, styles.featuresPage]}>
                         <View style={styles.pageBadge}>
                             <Text style={styles.pageBadgeText}>{item.badge}</Text>
                         </View>
@@ -169,7 +173,7 @@ export default function LandingScreen() {
 
             case 'steps':
                 return (
-                    <View style={[styles.page, styles.stepsPage]}>
+                    <View style={[pageStyle, styles.stepsPage]}>
                         <View style={styles.pageBadge}>
                             <Text style={styles.pageBadgeText}>{item.badge}</Text>
                         </View>
@@ -198,7 +202,7 @@ export default function LandingScreen() {
 
             case 'rights':
                 return (
-                    <View style={[styles.page, styles.rightsPage]}>
+                    <View style={[pageStyle, styles.rightsPage]}>
                         <View style={[styles.pageBadge, { backgroundColor: `${COLORS.accentOrange}20` }]}>
                             <Text style={[styles.pageBadgeText, { color: COLORS.accentOrange }]}>{item.badge}</Text>
                         </View>
@@ -224,7 +228,7 @@ export default function LandingScreen() {
 
             case 'cta':
                 return (
-                    <View style={[styles.page, styles.ctaPage]}>
+                    <View style={[pageStyle, styles.ctaPage]}>
                         <View style={styles.ctaIcon}>
                             <MaterialCommunityIcons name="scale-balance" size={60} color="white" />
                         </View>
@@ -264,8 +268,8 @@ export default function LandingScreen() {
                 onViewableItemsChanged={onViewableItemsChanged}
                 viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
                 getItemLayout={(_, index) => ({
-                    length: SCREEN_WIDTH,
-                    offset: SCREEN_WIDTH * index,
+                    length: screenWidth,
+                    offset: screenWidth * index,
                     index,
                 })}
             />
@@ -314,60 +318,58 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: COLORS.darkSurface,
     },
-    page: {
-        width: SCREEN_WIDTH,
-        paddingHorizontal: SPACING.lg,
-        justifyContent: 'center',
-    },
+    // Note: page width is now set dynamically via pageStyle in renderPage
 
     // Hero Page
     heroPage: {
         backgroundColor: COLORS.darkSurface,
-        paddingTop: 80,
+        paddingTop: ms(60),
+        alignItems: 'flex-start',
     },
     heroBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        alignSelf: 'flex-start',
-        gap: 6,
+        gap: ms(6),
         backgroundColor: COLORS.primaryTransparent,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
+        paddingHorizontal: ms(12),
+        paddingVertical: ms(6),
         borderRadius: RADIUS.full,
-        marginBottom: SPACING.lg,
+        marginBottom: ms(16),
     },
     heroBadgeText: {
         color: COLORS.primary,
-        fontSize: 13,
+        fontSize: ms(12),
         fontFamily: 'Inter_600SemiBold',
     },
     heroTitle: {
-        fontSize: 38,
+        fontSize: ms(28),
         fontFamily: 'Inter_700Bold',
         color: COLORS.textWhite,
-        lineHeight: 46,
-        marginBottom: SPACING.md,
+        lineHeight: ms(36),
+        marginBottom: ms(12),
+        width: '100%',
     },
     gradientText: {
         color: COLORS.primary,
     },
     heroDescription: {
-        fontSize: 16,
+        fontSize: ms(14),
         fontFamily: 'Inter_400Regular',
         color: COLORS.textLight,
-        lineHeight: 24,
-        marginBottom: SPACING.xl,
+        lineHeight: ms(22),
+        marginBottom: ms(24),
     },
     heroFeatures: {
-        gap: SPACING.md,
+        gap: ms(12),
+        width: '100%',
     },
     heroFeatureItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.sm,
+        gap: ms(8),
     },
     heroFeatureText: {
-        fontSize: 15,
+        fontSize: ms(13),
         fontFamily: 'Inter_400Regular',
         color: COLORS.textLight,
     },
@@ -375,82 +377,86 @@ const styles = StyleSheet.create({
     // Features Page
     featuresPage: {
         backgroundColor: COLORS.lightBg,
-        paddingTop: 60,
+        paddingTop: ms(50),
     },
     pageBadge: {
         alignSelf: 'center',
         backgroundColor: COLORS.primaryTransparent,
-        paddingHorizontal: 14,
-        paddingVertical: 6,
+        paddingHorizontal: ms(12),
+        paddingVertical: ms(5),
         borderRadius: RADIUS.full,
-        marginBottom: SPACING.md,
+        marginBottom: ms(12),
     },
     pageBadgeText: {
         color: COLORS.primary,
-        fontSize: 13,
+        fontSize: ms(12),
         fontFamily: 'Inter_600SemiBold',
     },
     pageTitle: {
-        fontSize: 28,
+        fontSize: ms(22),
         fontFamily: 'Inter_700Bold',
         color: COLORS.textDark,
         textAlign: 'center',
-        lineHeight: 36,
-        marginBottom: SPACING.xl,
+        lineHeight: ms(30),
+        marginBottom: ms(20),
+        width: '100%',
+        paddingHorizontal: ms(8),
     },
     featuresGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: SPACING.md,
+        gap: ms(12),
         justifyContent: 'center',
+        width: '100%',
     },
     featureCard: {
-        width: (SCREEN_WIDTH - SPACING.lg * 2 - SPACING.md) / 2,
+        width: wp(43),
         backgroundColor: 'white',
         borderRadius: RADIUS.lg,
-        padding: SPACING.md,
+        padding: ms(14),
         ...SHADOWS.card,
     },
     featureIcon: {
-        width: 44,
-        height: 44,
+        width: ms(40),
+        height: ms(40),
         borderRadius: RADIUS.md,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: SPACING.sm,
+        marginBottom: ms(8),
     },
     featureTitle: {
-        fontSize: 14,
+        fontSize: ms(13),
         fontFamily: 'Inter_600SemiBold',
         color: COLORS.textDark,
         marginBottom: 2,
     },
     featureDesc: {
-        fontSize: 12,
+        fontSize: ms(11),
         fontFamily: 'Inter_400Regular',
         color: COLORS.textMuted,
-        lineHeight: 16,
+        lineHeight: ms(15),
     },
 
     // Steps Page
     stepsPage: {
         backgroundColor: COLORS.darkSurface,
-        paddingTop: 60,
+        paddingTop: ms(50),
     },
     stepsContainer: {
-        gap: SPACING.md,
+        gap: ms(12),
+        width: '100%',
     },
     stepCard: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: COLORS.darkCard,
         borderRadius: RADIUS.lg,
-        padding: SPACING.md,
-        gap: SPACING.md,
+        padding: ms(14),
+        gap: ms(12),
     },
     stepLeft: {
-        width: 44,
-        height: 44,
+        width: ms(40),
+        height: ms(40),
         borderRadius: RADIUS.md,
         backgroundColor: COLORS.primaryTransparent,
         alignItems: 'center',
@@ -460,24 +466,24 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     stepTitle: {
-        fontSize: 15,
+        fontSize: ms(14),
         fontFamily: 'Inter_600SemiBold',
         color: 'white',
         marginBottom: 2,
     },
     stepDesc: {
-        fontSize: 13,
+        fontSize: ms(12),
         fontFamily: 'Inter_400Regular',
         color: COLORS.textLight,
     },
     stepNum: {
         backgroundColor: COLORS.primaryTransparent,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
+        paddingHorizontal: ms(8),
+        paddingVertical: ms(3),
         borderRadius: RADIUS.sm,
     },
     stepNumText: {
-        fontSize: 13,
+        fontSize: ms(12),
         fontFamily: 'Inter_700Bold',
         color: COLORS.primary,
     },
@@ -485,23 +491,24 @@ const styles = StyleSheet.create({
     // Rights Page
     rightsPage: {
         backgroundColor: COLORS.lightBg,
-        paddingTop: 60,
+        paddingTop: ms(50),
     },
     rightsGrid: {
-        gap: SPACING.md,
+        gap: ms(12),
+        width: '100%',
     },
     rightCard: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'white',
         borderRadius: RADIUS.lg,
-        padding: SPACING.md,
-        gap: SPACING.md,
+        padding: ms(14),
+        gap: ms(12),
         ...SHADOWS.card,
     },
     rightIconContainer: {
-        width: 44,
-        height: 44,
+        width: ms(40),
+        height: ms(40),
         borderRadius: RADIUS.md,
         backgroundColor: `${COLORS.accentOrange}15`,
         alignItems: 'center',
@@ -511,12 +518,12 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     rightTitle: {
-        fontSize: 15,
+        fontSize: ms(14),
         fontFamily: 'Inter_600SemiBold',
         color: COLORS.textDark,
     },
     rightArticle: {
-        fontSize: 12,
+        fontSize: ms(11),
         fontFamily: 'Inter_500Medium',
         color: COLORS.primary,
         marginTop: 2,
@@ -526,60 +533,60 @@ const styles = StyleSheet.create({
     ctaPage: {
         backgroundColor: COLORS.darkSurface,
         alignItems: 'center',
-        paddingTop: 60,
+        paddingTop: ms(50),
     },
     ctaIcon: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
+        width: ms(100),
+        height: ms(100),
+        borderRadius: ms(50),
         backgroundColor: COLORS.primary,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: SPACING.xl,
+        marginBottom: ms(24),
         ...SHADOWS.glow,
     },
     ctaTitle: {
-        fontSize: 32,
+        fontSize: ms(28),
         fontFamily: 'Inter_700Bold',
         color: 'white',
         textAlign: 'center',
-        lineHeight: 40,
-        marginBottom: SPACING.md,
+        lineHeight: ms(36),
+        marginBottom: ms(12),
     },
     ctaDescription: {
-        fontSize: 16,
+        fontSize: ms(14),
         fontFamily: 'Inter_400Regular',
         color: COLORS.textLight,
         textAlign: 'center',
-        lineHeight: 24,
-        marginBottom: SPACING.xl,
+        lineHeight: ms(22),
+        marginBottom: ms(24),
     },
     ctaBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.sm,
+        gap: ms(8),
         backgroundColor: COLORS.primary,
-        paddingVertical: 16,
-        paddingHorizontal: 28,
+        paddingVertical: ms(14),
+        paddingHorizontal: ms(24),
         borderRadius: RADIUS.md,
-        marginBottom: SPACING.md,
+        marginBottom: ms(12),
         ...SHADOWS.glow,
     },
     ctaBtnText: {
         color: 'white',
-        fontSize: 16,
+        fontSize: ms(15),
         fontFamily: 'Inter_600SemiBold',
     },
     ctaSecondaryBtn: {
-        paddingVertical: 14,
-        paddingHorizontal: 28,
+        paddingVertical: ms(12),
+        paddingHorizontal: ms(24),
         borderRadius: RADIUS.md,
         borderWidth: 2,
         borderColor: COLORS.primary,
     },
     ctaSecondaryBtnText: {
         color: COLORS.primary,
-        fontSize: 16,
+        fontSize: ms(15),
         fontFamily: 'Inter_600SemiBold',
     },
 
@@ -589,34 +596,34 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
-        paddingHorizontal: SPACING.lg,
-        paddingTop: SPACING.lg,
+        paddingHorizontal: ms(20),
+        paddingTop: ms(16),
         backgroundColor: 'rgba(26, 31, 46, 0.95)',
     },
     dots: {
         flexDirection: 'row',
         justifyContent: 'center',
-        gap: SPACING.sm,
-        marginBottom: SPACING.lg,
+        gap: ms(6),
+        marginBottom: ms(16),
     },
     dot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
+        width: ms(7),
+        height: ms(7),
+        borderRadius: ms(4),
         backgroundColor: COLORS.textMuted,
     },
     dotActive: {
-        width: 24,
+        width: ms(20),
         backgroundColor: COLORS.primary,
     },
     footerButtons: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        gap: SPACING.md,
+        gap: ms(12),
     },
     skipBtn: {
         flex: 1,
-        paddingVertical: 14,
+        paddingVertical: ms(12),
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: RADIUS.md,
@@ -625,7 +632,7 @@ const styles = StyleSheet.create({
     },
     skipBtnText: {
         color: COLORS.textLight,
-        fontSize: 16,
+        fontSize: ms(15),
         fontFamily: 'Inter_500Medium',
     },
     nextBtn: {
@@ -633,17 +640,18 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: SPACING.sm,
+        gap: ms(6),
         backgroundColor: COLORS.primary,
-        paddingVertical: 14,
+        paddingVertical: ms(12),
         borderRadius: RADIUS.md,
     },
     nextBtnText: {
         color: 'white',
-        fontSize: 16,
+        fontSize: ms(15),
         fontFamily: 'Inter_600SemiBold',
     },
     fullWidthBtn: {
         flex: 2,
     },
 });
+

@@ -9,6 +9,7 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
+import { wp, hp, ms, screenSize } from '../constants/responsive';
 
 const DISCLAIMERS = [
     {
@@ -85,7 +86,7 @@ export default function DisclaimerScreen() {
                     <Feather name="alert-triangle" size={32} color={COLORS.errorRed} />
                     <Text style={styles.mainWarningTitle}>Legal Information Only</Text>
                     <Text style={styles.mainWarningText}>
-                        NyayaSahay is an AI-powered legal information service. It is NOT a substitute 
+                        NyayaSahay is an AI-powered legal information service. It is NOT a substitute
                         for professional legal advice from a qualified advocate.
                     </Text>
                 </View>
@@ -106,7 +107,7 @@ export default function DisclaimerScreen() {
                 {/* Acknowledgment */}
                 <View style={styles.acknowledgment}>
                     <Text style={styles.acknowledgmentText}>
-                        By using NyayaSahay, you acknowledge that you have read, understood, 
+                        By using NyayaSahay, you acknowledge that you have read, understood,
                         and agree to this disclaimer.
                     </Text>
                 </View>

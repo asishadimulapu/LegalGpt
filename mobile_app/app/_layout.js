@@ -120,14 +120,6 @@ function CustomDrawerContent(props) {
                     <Text style={styles.newChatBtnText}>New Chat</Text>
                 </Pressable>
 
-                {/* User Section */}
-                {user && (
-                    <View style={styles.userSection}>
-                        <Feather name="user" size={16} color={COLORS.textLight} />
-                        <Text style={styles.userEmail} numberOfLines={1}>{user.email}</Text>
-                    </View>
-                )}
-
                 {/* Chat History (if logged in) */}
                 {user && (
                     <View style={styles.section}>
@@ -187,44 +179,62 @@ function CustomDrawerContent(props) {
 
             {/* Footer */}
             <View style={[styles.drawerFooter, { paddingBottom: insets.bottom + SPACING.md }]}>
-                <View style={styles.footerRow}>
-                    <Pressable style={styles.footerLink} onPress={() => router.push('/about')}>
-                        <Feather name="info" size={16} color={COLORS.textLight} />
-                        <Text style={styles.footerLinkText}>About</Text>
-                    </Pressable>
-                    <Pressable style={styles.footerLink} onPress={() => router.push('/faq')}>
-                        <Feather name="help-circle" size={16} color={COLORS.textLight} />
-                        <Text style={styles.footerLinkText}>FAQ</Text>
-                    </Pressable>
-                    <Pressable style={styles.footerLink} onPress={() => router.push('/contact')}>
-                        <Feather name="mail" size={16} color={COLORS.textLight} />
-                        <Text style={styles.footerLinkText}>Contact</Text>
-                    </Pressable>
+                {/* Footer Links */}
+                <View style={styles.footerLinksContainer}>
+                    <View style={styles.footerRow}>
+                        <Pressable style={styles.footerLink} onPress={() => router.push('/about')}>
+                            <Feather name="info" size={14} color={COLORS.textMuted} />
+                            <Text style={styles.footerLinkText}>About</Text>
+                        </Pressable>
+                        <Pressable style={styles.footerLink} onPress={() => router.push('/faq')}>
+                            <Feather name="help-circle" size={14} color={COLORS.textMuted} />
+                            <Text style={styles.footerLinkText}>FAQ</Text>
+                        </Pressable>
+                        <Pressable style={styles.footerLink} onPress={() => router.push('/contact')}>
+                            <Feather name="mail" size={14} color={COLORS.textMuted} />
+                            <Text style={styles.footerLinkText}>Contact</Text>
+                        </Pressable>
+                    </View>
+                    <View style={styles.footerRow}>
+                        <Pressable style={styles.footerLink} onPress={() => router.push('/privacy')}>
+                            <Feather name="shield" size={14} color={COLORS.textMuted} />
+                            <Text style={styles.footerLinkText}>Privacy</Text>
+                        </Pressable>
+                        <Pressable style={styles.footerLink} onPress={() => router.push('/terms')}>
+                            <Feather name="file-text" size={14} color={COLORS.textMuted} />
+                            <Text style={styles.footerLinkText}>Terms</Text>
+                        </Pressable>
+                        <Pressable style={styles.footerLink} onPress={() => router.push('/disclaimer')}>
+                            <Feather name="alert-circle" size={14} color={COLORS.textMuted} />
+                            <Text style={styles.footerLinkText}>Disclaimer</Text>
+                        </Pressable>
+                    </View>
                 </View>
-                <View style={styles.footerRow}>
-                    <Pressable style={styles.footerLink} onPress={() => router.push('/privacy')}>
-                        <Feather name="shield" size={16} color={COLORS.textLight} />
-                        <Text style={styles.footerLinkText}>Privacy</Text>
-                    </Pressable>
-                    <Pressable style={styles.footerLink} onPress={() => router.push('/terms')}>
-                        <Feather name="file-text" size={16} color={COLORS.textLight} />
-                        <Text style={styles.footerLinkText}>Terms</Text>
-                    </Pressable>
-                    <Pressable style={styles.footerLink} onPress={() => router.push('/disclaimer')}>
-                        <Feather name="alert-circle" size={16} color={COLORS.textLight} />
-                        <Text style={styles.footerLinkText}>Disclaimer</Text>
-                    </Pressable>
-                </View>
-                {user && (
-                    <Pressable style={styles.logoutBtn} onPress={handleLogout}>
-                        <Feather name="log-out" size={18} color={COLORS.errorRed} />
-                        <Text style={styles.logoutBtnText}>Logout</Text>
-                    </Pressable>
-                )}
-                {!user && (
+
+                {/* Unified Account Section */}
+                {user ? (
+                    <View style={styles.accountCard}>
+                        <View style={styles.accountInfo}>
+                            <View style={styles.avatarContainer}>
+                                <Feather name="user" size={20} color={COLORS.primary} />
+                            </View>
+                            <View style={styles.accountDetails}>
+                                <Text style={styles.accountEmail} numberOfLines={1}>{user.email}</Text>
+                                <Text style={styles.accountLabel}>Logged in</Text>
+                            </View>
+                        </View>
+                        <Pressable style={styles.logoutBtn} onPress={handleLogout}>
+                            <Feather name="log-out" size={16} color={COLORS.errorRed} />
+                            <Text style={styles.logoutBtnText}>Logout</Text>
+                        </Pressable>
+                    </View>
+                ) : (
                     <Pressable style={styles.loginBtn} onPress={() => { router.push('/auth'); props.navigation.closeDrawer(); }}>
-                        <Feather name="log-in" size={18} color={COLORS.primary} />
+                        <View style={styles.loginIconContainer}>
+                            <Feather name="user" size={18} color={COLORS.primary} />
+                        </View>
                         <Text style={styles.loginBtnText}>Login / Register</Text>
+                        <Feather name="chevron-right" size={18} color={COLORS.primary} />
                     </Pressable>
                 )}
             </View>
@@ -323,21 +333,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontFamily: 'Inter_600SemiBold',
     },
-    userSection: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: SPACING.sm,
-        backgroundColor: COLORS.darkCard,
-        padding: SPACING.md,
-        borderRadius: RADIUS.md,
-        marginBottom: SPACING.md,
-    },
-    userEmail: {
-        color: COLORS.textLight,
-        fontSize: 14,
-        fontFamily: 'Inter_400Regular',
-        flex: 1,
-    },
+
     section: {
         marginBottom: SPACING.lg,
     },
@@ -404,11 +400,14 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     drawerFooter: {
-        paddingHorizontal: SPACING.lg,
-        paddingTop: SPACING.lg,
+        paddingHorizontal: SPACING.md,
+        paddingTop: SPACING.md,
         borderTopWidth: 1,
         borderTopColor: COLORS.whiteOverlay,
-        gap: SPACING.sm,
+        gap: SPACING.md,
+    },
+    footerLinksContainer: {
+        gap: SPACING.xs,
     },
     footerRow: {
         flexDirection: 'row',
@@ -417,46 +416,83 @@ const styles = StyleSheet.create({
     footerLink: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.xs,
-        paddingVertical: 10,
-        paddingHorizontal: 8,
-        borderRadius: RADIUS.md,
+        gap: 4,
+        paddingVertical: 6,
+        paddingHorizontal: 6,
     },
     footerLinkText: {
+        fontSize: 11,
+        fontFamily: 'Inter_400Regular',
+        color: COLORS.textMuted,
+    },
+    accountCard: {
+        backgroundColor: COLORS.darkCard,
+        borderRadius: RADIUS.lg,
+        padding: SPACING.md,
+        gap: SPACING.md,
+    },
+    accountInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.md,
+    },
+    avatarContainer: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: COLORS.primaryTransparent,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    accountDetails: {
+        flex: 1,
+    },
+    accountEmail: {
+        fontSize: 14,
+        fontFamily: 'Inter_500Medium',
+        color: COLORS.textWhite,
+    },
+    accountLabel: {
         fontSize: 12,
         fontFamily: 'Inter_400Regular',
-        color: COLORS.textLight,
+        color: COLORS.textMuted,
+        marginTop: 2,
     },
     logoutBtn: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
         gap: SPACING.sm,
-        paddingVertical: 12,
-        paddingHorizontal: 14,
+        paddingVertical: 10,
         borderRadius: RADIUS.md,
-        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-        borderWidth: 1,
-        borderColor: 'rgba(239, 68, 68, 0.3)',
+        backgroundColor: 'rgba(239, 68, 68, 0.15)',
     },
     logoutBtnText: {
-        fontSize: 15,
-        fontFamily: 'Inter_400Regular',
+        fontSize: 14,
+        fontFamily: 'Inter_500Medium',
         color: COLORS.errorRed,
     },
     loginBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.sm,
-        paddingVertical: 12,
-        paddingHorizontal: 14,
-        borderRadius: RADIUS.md,
+        gap: SPACING.md,
+        paddingVertical: SPACING.md,
+        paddingHorizontal: SPACING.md,
+        borderRadius: RADIUS.lg,
+        backgroundColor: COLORS.darkCard,
+    },
+    loginIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         backgroundColor: COLORS.primaryTransparent,
-        borderWidth: 1,
-        borderColor: COLORS.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     loginBtnText: {
+        flex: 1,
         fontSize: 15,
         fontFamily: 'Inter_500Medium',
-        color: COLORS.primary,
+        color: COLORS.textWhite,
     },
 });

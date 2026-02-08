@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Scale, Menu, X, LogOut, User } from 'lucide-react';
+import { Scale, Menu, X, LogOut, User, MessageCircle } from 'lucide-react';
 import '../styles/header.css';
 
 function Header({ onAuthClick, user, onLogout }) {
@@ -82,6 +82,9 @@ function Header({ onAuthClick, user, onLogout }) {
                 <div className="auth-buttons">
                     {user ? (
                         <>
+                            <Link to="/chat" className="btn-chat">
+                                <MessageCircle size={16} /> Chat
+                            </Link>
                             <span className="user-email">
                                 <User size={16} /> {user.email}
                             </span>
@@ -91,6 +94,9 @@ function Header({ onAuthClick, user, onLogout }) {
                         </>
                     ) : (
                         <>
+                            <Link to="/chat" className="btn-chat">
+                                <MessageCircle size={16} /> Try Chat
+                            </Link>
                             <button className="btn-signin" onClick={() => onAuthClick('signin')}>
                                 Sign In
                             </button>

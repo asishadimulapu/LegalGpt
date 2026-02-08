@@ -4,7 +4,9 @@
  */
 
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Scale, X, Mail, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import GoogleAuth from './GoogleAuth';
 import '../styles/auth.css';
 
 function AuthModal({ isOpen, mode, onClose, onSubmit, onSwitchMode }) {
@@ -104,6 +106,17 @@ function AuthModal({ isOpen, mode, onClose, onSubmit, onSwitchMode }) {
                             : 'Join NyayaSahay for personalized legal guidance'
                         }
                     </p>
+                </div>
+
+                {/* Google OAuth */}
+                <GoogleAuth
+                    isLoading={isLoading}
+                    onError={(msg) => setError(msg)}
+                />
+
+                {/* Divider */}
+                <div className="auth-divider">
+                    <span>or continue with email</span>
                 </div>
 
                 {/* Form */}
@@ -215,7 +228,10 @@ function AuthModal({ isOpen, mode, onClose, onSubmit, onSwitchMode }) {
 
                 {/* Disclaimer */}
                 <p className="auth-disclaimer">
-                    By continuing, you agree to our Terms of Service and Privacy Policy
+                    By continuing, you agree to our{' '}
+                    <Link to="/terms" onClick={onClose} className="auth-legal-link">Terms of Service</Link>
+                    {' '}and{' '}
+                    <Link to="/privacy" onClick={onClose} className="auth-legal-link">Privacy Policy</Link>
                 </p>
             </div>
         </div>

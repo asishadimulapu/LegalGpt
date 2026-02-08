@@ -351,16 +351,6 @@ function Chat({ user, onLogout }) {
                     <Plus size={18} /> New Chat
                 </button>
 
-                {/* User Section */}
-                {user && (
-                    <div className="sidebar-user-section">
-                        <div className="sidebar-user-info">
-                            <User size={16} />
-                            <span className="sidebar-user-email">{user.email}</span>
-                        </div>
-                    </div>
-                )}
-
                 {/* Chat History */}
                 {user && (
                     <div className="sidebar-section">
@@ -419,16 +409,38 @@ function Chat({ user, onLogout }) {
                 )}
 
                 <div className="sidebar-footer">
-                    <Link to="/about" className="sidebar-link">
-                        <Info size={18} /> About
-                    </Link>
-                    <Link to="/" className="sidebar-link">
-                        <Home size={18} /> Home
-                    </Link>
-                    {user && (
-                        <button className="sidebar-link logout-btn" onClick={handleLogout}>
-                            <LogOut size={18} /> Logout
-                        </button>
+                    <div className="sidebar-footer-links">
+                        <Link to="/about" className="sidebar-link">
+                            <Info size={16} /> About
+                        </Link>
+                        <Link to="/" className="sidebar-link">
+                            <Home size={16} /> Home
+                        </Link>
+                    </div>
+                    
+                    {/* Unified Account Section */}
+                    {user ? (
+                        <div className="account-card">
+                            <div className="account-info">
+                                <div className="account-avatar">
+                                    <User size={20} />
+                                </div>
+                                <div className="account-details">
+                                    <span className="account-email">{user.email}</span>
+                                    <span className="account-status">Logged in</span>
+                                </div>
+                            </div>
+                            <button className="logout-btn" onClick={handleLogout}>
+                                <LogOut size={16} /> Logout
+                            </button>
+                        </div>
+                    ) : (
+                        <Link to="/" className="login-card">
+                            <div className="login-avatar">
+                                <User size={18} />
+                            </div>
+                            <span>Login / Register</span>
+                        </Link>
                     )}
                 </div>
             </aside>

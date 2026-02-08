@@ -312,7 +312,9 @@ class RAGPipeline:
         
         try:
             # Step 1: Retrieve relevant documents
+            retrieval_start = time.time()
             documents = self.retrieve(query, top_k)
+            retrieval_ms = int((time.time() - retrieval_start) * 1000)
             
             # Step 2: Check if any relevant documents found
             if not documents:
@@ -323,19 +325,22 @@ class RAGPipeline:
             # Step 3: Format context
             context = format_retrieved_context(documents)
             
-            # Step 4: Generate response
+            # Step 4: Generate response (LLM - usually the slowest part!)
+            llm_start = time.time()
             answer = self.generate_response(query, context)
+            llm_ms = int((time.time() - llm_start) * 1000)
             
             # Step 5: Format sources
             sources = self.format_sources(documents)
             
-            # Calculate latency
+            # Calculate total latency
             latency_ms = int((time.time() - start_time) * 1000)
             
             # Check if response is a fallback
             is_fallback = FALLBACK_RESPONSE.lower() in answer.lower()
             
-            logger.info(f"Query completed in {latency_ms}ms")
+            # Detailed timing breakdown
+            logger.info(f"Query completed in {latency_ms}ms (retrieval={retrieval_ms}ms, LLM={llm_ms}ms)")
             
             return answer, sources, is_fallback, latency_ms
         

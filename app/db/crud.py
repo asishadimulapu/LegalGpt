@@ -130,6 +130,107 @@ class UserCRUD:
             db.rollback()
             logger.error(f"Password update failed: {e}")
             raise
+    
+    # -------------------------------------------------------------------------
+    # OAuth Methods
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def get_by_google_id(db: Session, google_id: str) -> Optional[User]:
+        """
+        Get user by Google OAuth ID.
+        
+        Returns:
+            User if found, None if not found
+        """
+        try:
+            return db.query(User).filter(User.google_id == google_id).first()
+        except SQLAlchemyError as e:
+            logger.exception(f"Failed to get user by google_id: {e}")
+            raise
+    
+    @staticmethod
+    def create_google_user(
+        db: Session,
+        email: str,
+        full_name: str,
+        google_id: str,
+        picture_url: Optional[str] = None
+    ) -> User:
+        """
+        Create a new user from Google OAuth.
+        
+        Args:
+            db: Database session
+            email: User's email from Google
+            full_name: User's name from Google
+            google_id: Google's unique user ID
+            picture_url: Google profile picture URL
+            
+        Returns:
+            User: Created user object
+        """
+        try:
+            # Generate a random secure password (user won't use it)
+            import secrets
+            random_password = secrets.token_urlsafe(32)
+            hashed_password = get_password_hash(random_password)
+            
+            db_user = User(
+                email=email,
+                hashed_password=hashed_password,
+                full_name=full_name,
+                google_id=google_id,
+                auth_provider="google",
+                picture_url=picture_url
+            )
+            db.add(db_user)
+            db.flush()
+            db.refresh(db_user)
+            db.commit()
+            logger.info(f"Created Google OAuth user: {email}")
+            return db_user
+        except IntegrityError as e:
+            db.rollback()
+            logger.warning(f"Google user creation failed (duplicate): {email}")
+            raise
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"Google user creation failed: {e}")
+            raise
+    
+    @staticmethod
+    def link_google_account(
+        db: Session,
+        user: User,
+        google_id: str,
+        picture_url: Optional[str] = None
+    ) -> User:
+        """
+        Link an existing email user to their Google account.
+        
+        Args:
+            db: Database session
+            user: Existing user to link
+            google_id: Google's unique user ID
+            picture_url: Google profile picture URL
+            
+        Returns:
+            User: Updated user object
+        """
+        try:
+            user.google_id = google_id
+            user.auth_provider = "google"
+            if picture_url:
+                user.picture_url = picture_url
+            db.flush()
+            db.commit()
+            db.refresh(user)
+            logger.info(f"Linked Google account for user: {user.email}")
+            return user
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"Failed to link Google account: {e}")
+            raise
 
 
 # =============================================================================

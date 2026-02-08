@@ -273,6 +273,17 @@
     margin-top: var(--spacing-md);
 }
 
+.auth-legal-link {
+    color: #26B8B8;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.auth-legal-link:hover {
+    color: #3dd4d4;
+    text-decoration: underline;
+}
+
 /* =============================================================================
    RESPONSIVE & ACCESSIBILITY FIXES
    ============================================================================= */
@@ -302,17 +313,18 @@
         padding: var(--spacing-lg, 24px);
         margin: 0;
     }
-    
+
     .auth-overlay {
         padding: 0;
     }
-    
+
     .form-group input {
-        font-size: 16px; /* Prevents zoom on iOS */
+        font-size: 16px;
+        /* Prevents zoom on iOS */
         padding: 16px;
         min-height: 52px;
     }
-    
+
     .auth-header h2 {
         font-size: 1.35rem;
     }
@@ -323,7 +335,7 @@
     .auth-modal {
         padding: var(--spacing-md, 16px);
     }
-    
+
     .form-group input {
         padding: 12px 14px;
     }
@@ -338,7 +350,7 @@
         color: #ffffff !important;
         -webkit-text-fill-color: #ffffff !important;
     }
-    
+
     .form-group input::placeholder {
         color: #9ca3af;
     }

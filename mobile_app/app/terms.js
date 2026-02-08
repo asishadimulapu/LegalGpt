@@ -9,6 +9,7 @@ import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
+import { wp, hp, ms, screenSize } from '../constants/responsive';
 
 const SECTIONS = [
     {

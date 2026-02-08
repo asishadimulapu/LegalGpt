@@ -10,6 +10,7 @@ PRODUCTION NOTES:
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError, OperationalError, IntegrityError
 
@@ -308,16 +309,300 @@ async def login(
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_profile(
     db: Session = Depends(get_db),
-    user = Depends(lambda: None)  # Placeholder, will use proper dependency
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
 ) -> UserResponse:
     """
     Get current user's profile.
-    Requires authentication.
+    Requires authentication via JWT token.
+    
+    Returns:
+        UserResponse: Current user's profile
+        
+    Raises:
+        HTTPException: 401 if not authenticated or token invalid
     """
-    from app.api.dependencies import get_current_user
-    # This would need proper integration - placeholder for now
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Endpoint under development"
+    from app.utils.auth import decode_access_token
+    from app.db.crud import UserCRUD
+    from uuid import UUID
+    
+    # Decode and validate token
+    token = credentials.credentials
+    payload = decode_access_token(token)
+    
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload"
+        )
+    
+    try:
+        user = UserCRUD.get_by_id(db, UUID(user_id))
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found"
+        )
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found"
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is disabled"
+        )
+    
+    return UserResponse(
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        is_active=user.is_active,
+        created_at=user.created_at
     )
+
+
+# =============================================================================
+# Google OAuth 2.0 Endpoints
+# =============================================================================
+from pydantic import BaseModel
+from app.config import settings
+import httpx
+import secrets
+
+
+class GoogleAuthURL(BaseModel):
+    """Response for Google OAuth URL."""
+    auth_url: str
+    state: str
+
+
+class GoogleCallback(BaseModel):
+    """Request body for Google OAuth callback."""
+    code: str
+    code_verifier: str
+    state: str
+
+
+class GoogleAuthResponse(BaseModel):
+    """Response for successful Google OAuth."""
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
+@router.get("/google/url", response_model=GoogleAuthURL)
+async def get_google_oauth_url():
+    """
+    Get Google OAuth URL for frontend redirect.
+    
+    Returns:
+        GoogleAuthURL: OAuth URL and state for CSRF protection
+        
+    Viva Explanation:
+    - Generates a secure state parameter for CSRF protection
+    - Frontend will redirect user to this URL
+    - Google handles authentication and redirects back
+    """
+    if not settings.google_client_id:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google OAuth not configured. Set GOOGLE_CLIENT_ID in environment."
+        )
+    
+    # Generate state for CSRF protection
+    state = secrets.token_urlsafe(32)
+    
+    # Build Google OAuth URL
+    params = {
+        "client_id": settings.google_client_id,
+        "redirect_uri": settings.google_redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+        "access_type": "offline",
+        "prompt": "consent"
+    }
+    
+    query_string = "&".join(f"{k}={v}" for k, v in params.items())
+    auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{query_string}"
+    
+    return GoogleAuthURL(auth_url=auth_url, state=state)
+
+
+@router.post("/google/callback", response_model=GoogleAuthResponse)
+async def google_oauth_callback(
+    callback_data: GoogleCallback,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Handle Google OAuth callback.
+    Exchanges authorization code for tokens and creates/links user.
+    
+    Flow:
+    1. Exchange code for Google tokens (with PKCE verifier)
+    2. Decode ID token to get user info
+    3. Find existing user by google_id OR email
+    4. Create new user or link existing account
+    5. Return JWT token for our app
+    
+    Viva Explanation:
+    - PKCE (Proof Key for Code Exchange) prevents authorization code interception
+    - ID token contains user info (email, name, picture)
+    - Auto-links if email already exists in our system
+    """
+    if not settings.google_client_id or not settings.google_client_secret:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google OAuth not configured"
+        )
+    
+    client_ip = get_client_ip(request)
+    
+    try:
+        # Step 1: Exchange authorization code for tokens
+        async with httpx.AsyncClient() as client:
+            token_response = await client.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "client_id": settings.google_client_id,
+                    "client_secret": settings.google_client_secret,
+                    "code": callback_data.code,
+                    "code_verifier": callback_data.code_verifier,
+                    "grant_type": "authorization_code",
+                    "redirect_uri": settings.google_redirect_uri
+                }
+            )
+        
+        if token_response.status_code != 200:
+            logger.error(f"Google token exchange failed: {token_response.text}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Failed to authenticate with Google"
+            )
+        
+        tokens = token_response.json()
+        
+        # Step 2: Get user info from Google
+        async with httpx.AsyncClient() as client:
+            userinfo_response = await client.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {tokens['access_token']}"}
+            )
+        
+        if userinfo_response.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Failed to get user info from Google"
+            )
+        
+        google_user = userinfo_response.json()
+        google_id = google_user.get("id")
+        email = google_user.get("email")
+        name = google_user.get("name", "")
+        picture = google_user.get("picture")
+        
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email not provided by Google"
+            )
+        
+        # Step 3: Find or create user
+        user = None
+        
+        # First, check if user exists by Google ID
+        user = UserCRUD.get_by_google_id(db, google_id)
+        
+        if not user:
+            # Check if user exists by email (for account linking)
+            user = UserCRUD.get_by_email(db, email)
+            
+            if user:
+                # Link existing email account to Google
+                user = UserCRUD.link_google_account(db, user, google_id, picture)
+                logger.info(f"Linked Google account to existing user: {email}")
+                
+                AuditLogger.log_event(
+                    db=db,
+                    event_type="google_account_linked",
+                    event_category="authentication",
+                    severity="info",
+                    user_id=user.id,
+                    ip_address=client_ip,
+                    details={"email": email},
+                    success=True,
+                    force_commit=True
+                )
+            else:
+                # Create new user from Google
+                user = UserCRUD.create_google_user(
+                    db=db,
+                    email=email,
+                    full_name=name,
+                    google_id=google_id,
+                    picture_url=picture
+                )
+                logger.info(f"Created new Google OAuth user: {email}")
+                
+                AuditLogger.log_event(
+                    db=db,
+                    event_type="google_registration_success",
+                    event_category="authentication",
+                    severity="info",
+                    user_id=user.id,
+                    ip_address=client_ip,
+                    details={"email": email},
+                    success=True,
+                    force_commit=True
+                )
+        
+        # Step 4: Check if user is active
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is disabled"
+            )
+        
+        # Step 5: Log successful login and create JWT
+        AuditLogger.log_login(
+            db=db,
+            user_id=user.id,
+            ip_address=client_ip,
+            user_agent=request.headers.get("User-Agent"),
+            success=True
+        )
+        
+        access_token = create_access_token(subject=user.id)
+        
+        return GoogleAuthResponse(
+            access_token=access_token,
+            user=UserResponse(
+                id=user.id,
+                email=user.email,
+                full_name=user.full_name,
+                is_active=user.is_active,
+                created_at=user.created_at
+            )
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Google OAuth error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Authentication failed. Please try again."
+        )
 

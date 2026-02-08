@@ -20,9 +20,10 @@ import Terms from './pages/Terms';
 import Contact from './pages/Contact';
 import FAQ from './pages/FAQ';
 import Disclaimer from './pages/Disclaimer';
+import AuthCallback from './pages/AuthCallback';
 
 // Services
-import { registerUser, loginUser } from './services/api';
+import { registerUser, loginUser, validateToken } from './services/api';
 
 /**
  * App Layout Component - provides navigation context
@@ -31,11 +32,35 @@ function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [authModal, setAuthModal] = useState({ isOpen: false, mode: 'signin' });
-  const [user, setUser] = useState(() => {
-    // Check localStorage for saved user
-    const saved = localStorage.getItem('nyayasahay_user');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [user, setUser] = useState(null);
+
+  // Validate token on app load - prevent showing logged in with expired token
+  useEffect(() => {
+    const validateSession = async () => {
+      const saved = localStorage.getItem('nyayasahay_user');
+      if (saved) {
+        const userData = JSON.parse(saved);
+        try {
+          // Validate token with backend
+          const isValid = await validateToken(userData.token);
+          if (isValid) {
+            setUser(userData);
+          } else {
+            // Token expired - clear storage
+            console.log('Session expired, logging out');
+            localStorage.removeItem('nyayasahay_user');
+            setUser(null);
+          }
+        } catch (error) {
+          // Token invalid or server error - clear storage
+          console.log('Token validation failed:', error.message);
+          localStorage.removeItem('nyayasahay_user');
+          setUser(null);
+        }
+      }
+    };
+    validateSession();
+  }, []);
 
   // Handle auth modal
   const handleAuthClick = (mode) => {
@@ -87,6 +112,11 @@ function AppLayout() {
     navigate('/chat');
   };
 
+  // Handle OAuth login success
+  const handleOAuthSuccess = (userData) => {
+    setUser(userData);
+  };
+
   // Don't show header/footer on chat page for fullscreen experience
   const isChatPage = location.pathname === '/chat';
 
@@ -97,6 +127,7 @@ function AppLayout() {
       <Routes>
         <Route path="/" element={<Landing onTryNow={handleTryNow} onAuthClick={handleAuthClick} />} />
         <Route path="/chat" element={<Chat user={user} onAuthClick={handleAuthClick} onLogout={handleLogout} />} />
+        <Route path="/auth/callback" element={<AuthCallback onLoginSuccess={handleOAuthSuccess} />} />
         <Route path="/about" element={<About />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />

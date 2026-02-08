@@ -1,0 +1,150 @@
+/**
+ * OAuth Callback Page
+ * 
+ * Handles the redirect from Google OAuth:
+ * 1. Extracts authorization code and state from URL
+ * 2. Validates state matches stored value (CSRF protection)
+ * 3. Sends code + code_verifier to backend
+ * 4. Stores JWT token and redirects to chat
+ */
+
+import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import '../styles/auth-callback.css';
+
+function AuthCallback({ onLoginSuccess }) {
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const [status, setStatus] = useState('processing');
+    const [error, setError] = useState(null);
+    const isProcessing = useRef(false); // Prevent double execution
+
+    useEffect(() => {
+        const handleCallback = async () => {
+            // Prevent double execution (React Strict Mode / code reuse)
+            if (isProcessing.current) {
+                console.log('OAuth callback already processing, skipping...');
+                return;
+            }
+            isProcessing.current = true;
+
+            try {
+                // Step 1: Extract parameters from URL
+                const code = searchParams.get('code');
+                const state = searchParams.get('state');
+                const errorParam = searchParams.get('error');
+
+                // Check for Google OAuth errors
+                if (errorParam) {
+                    throw new Error(`Google OAuth error: ${errorParam}`);
+                }
+
+                if (!code) {
+                    throw new Error('Authorization code not found');
+                }
+
+                // Step 2: Validate state (CSRF protection)
+                const storedState = sessionStorage.getItem('oauth_state');
+                const codeVerifier = sessionStorage.getItem('oauth_code_verifier');
+
+                // Clear storage immediately to prevent reuse
+                sessionStorage.removeItem('oauth_state');
+                sessionStorage.removeItem('oauth_code_verifier');
+
+                if (!storedState || state !== storedState) {
+                    throw new Error('Invalid state parameter. Please try logging in again.');
+                }
+
+                if (!codeVerifier) {
+                    throw new Error('Code verifier not found. Please try logging in again.');
+                }
+
+                // Step 4: Exchange code for tokens via backend
+                const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+                const response = await fetch(`${API_BASE_URL}/api/v1/auth/google/callback`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        code: code,
+                        code_verifier: codeVerifier,
+                        state: state
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Authentication failed');
+                }
+
+                const data = await response.json();
+
+                // Step 5: Store user data and token
+                const userData = {
+                    email: data.user.email,
+                    name: data.user.full_name,
+                    token: data.access_token
+                };
+                localStorage.setItem('nyayasahay_user', JSON.stringify(userData));
+
+                // Notify parent component
+                if (onLoginSuccess) {
+                    onLoginSuccess(userData);
+                }
+
+                setStatus('success');
+
+                // Redirect to chat
+                setTimeout(() => {
+                    navigate('/chat');
+                }, 1000);
+
+            } catch (err) {
+                console.error('OAuth callback error:', err);
+                setStatus('error');
+                setError(err.message);
+            }
+        };
+
+        handleCallback();
+    }, [searchParams, navigate, onLoginSuccess]);
+
+    return (
+        <div className="auth-callback-container">
+            <div className="auth-callback-card">
+                {status === 'processing' && (
+                    <>
+                        <div className="auth-callback-spinner"></div>
+                        <h2>Signing you in...</h2>
+                        <p>Please wait while we complete your sign-in with Google.</p>
+                    </>
+                )}
+
+                {status === 'success' && (
+                    <>
+                        <div className="auth-callback-success">✓</div>
+                        <h2>Welcome!</h2>
+                        <p>Sign-in successful. Redirecting to chat...</p>
+                    </>
+                )}
+
+                {status === 'error' && (
+                    <>
+                        <div className="auth-callback-error">✗</div>
+                        <h2>Sign-in Failed</h2>
+                        <p className="error-message">{error}</p>
+                        <button
+                            className="retry-btn"
+                            onClick={() => navigate('/')}
+                        >
+                            Return to Home
+                        </button>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}
+
+export default AuthCallback;

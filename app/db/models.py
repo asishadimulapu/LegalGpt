@@ -99,6 +99,26 @@ class User(Base):
         comment="Last update timestamp"
     )
     
+    # OAuth fields
+    google_id = Column(
+        String(255),
+        unique=True,
+        nullable=True,
+        index=True,
+        comment="Google OAuth user ID"
+    )
+    auth_provider = Column(
+        String(50),
+        default="email",
+        nullable=False,
+        comment="Authentication provider: email, google"
+    )
+    picture_url = Column(
+        String(500),
+        nullable=True,
+        comment="User profile picture URL"
+    )
+    
     # Relationships
     chat_sessions = relationship(
         "ChatSession", 

@@ -31,10 +31,12 @@
 
 .message-avatar.bot {
     background: var(--primary);
+    color: white;
 }
 
 .message-avatar.user {
-    background: var(--dark-surface);
+    background: var(--primary-dark, #0d7377);
+    color: white;
 }
 
 /* Message Bubble */

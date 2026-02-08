@@ -114,6 +114,20 @@ async def health_check(
         "provider": settings.llm_provider
     }
     
+    # Check embedding cache stats
+    try:
+        from app.core.embeddings import embedding_generator
+        cache_stats = embedding_generator.get_cache_stats()
+        components["embedding_cache"] = {
+            "status": "healthy",
+            **cache_stats
+        }
+    except Exception as e:
+        components["embedding_cache"] = {
+            "status": "error",
+            "error": str(e)
+        }
+    
     return HealthResponse(
         status="healthy" if overall_healthy else "degraded",
         version=settings.app_version,

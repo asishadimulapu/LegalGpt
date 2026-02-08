@@ -11,6 +11,7 @@ import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
+import { wp, hp, ms, screenSize } from '../constants/responsive';
 
 const FAQ_DATA = [
     {
@@ -52,10 +53,10 @@ function FAQItem({ question, answer, isOpen, onToggle }) {
         <Pressable style={styles.faqItem} onPress={onToggle}>
             <View style={styles.faqQuestion}>
                 <Text style={styles.faqQuestionText}>{question}</Text>
-                <Feather 
-                    name={isOpen ? "chevron-up" : "chevron-down"} 
-                    size={20} 
-                    color={COLORS.primary} 
+                <Feather
+                    name={isOpen ? "chevron-up" : "chevron-down"}
+                    size={20}
+                    color={COLORS.primary}
                 />
             </View>
             {isOpen && (

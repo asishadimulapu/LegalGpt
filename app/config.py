@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     openrouter_model: str = "openai/gpt-oss-120b:free"
     groq_api_key: str = ""
-    groq_model: str = "llama-3.3-70b-versatile"  # Fast and free
+    groq_model: str = "llama-3.1-8b-instant"  # Fast model for low latency
     llm_temperature: float = 0.0  # Deterministic for legal accuracy
     
     # Embedding provider (Groq/OpenRouter don't provide embeddings)
@@ -80,6 +80,13 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
     
     # -------------------------------------------------------------------------
+    # Google OAuth 2.0
+    # -------------------------------------------------------------------------
+    google_client_id: str = ""  # Set in .env
+    google_client_secret: str = ""  # Set in .env
+    google_redirect_uri: str = "http://localhost:5173/auth/callback"
+    
+    # -------------------------------------------------------------------------
     # Encryption Configuration
     # -------------------------------------------------------------------------
     encryption_key: str = ""  # Required: for metadata encryption
@@ -114,7 +121,7 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     # RAG Configuration
     # -------------------------------------------------------------------------
-    top_k_results: int = 8
+    top_k_results: int = 5  # Reduced from 8 for faster retrieval
     chunk_size: int = 1500
     chunk_overlap: int = 300
     

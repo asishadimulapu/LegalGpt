@@ -159,41 +159,114 @@ class PgVectorStore:
     def similarity_search(
         self, 
         query: str, 
-        k: int = 5
+        k: int = 5,
+        use_hybrid: bool = True
     ) -> List[Document]:
         """
-        Perform similarity search using pgvector.
+        Perform hybrid search (BM25 keyword + vector similarity) using pgvector.
+        
+        Hybrid search combines:
+        1. Full-text search (keyword matching) - Fast, precise for exact terms
+        2. Vector similarity search - Semantic understanding
         
         Args:
             query: Search query text
             k: Number of results to return
+            use_hybrid: Whether to use hybrid search (default True)
             
         Returns:
             List[Document]: Most similar documents
+            
+        Viva Explanation:
+        - Hybrid search = BM25 + Vector (best of both worlds)
+        - BM25 finds exact keyword matches quickly
+        - Vector search finds semantically similar content
+        - Reciprocal Rank Fusion (RRF) combines both rankings
         """
+        import time
+        start_time = time.time()
+        
         # Generate query embedding
         query_embedding = self.embeddings.embed_query(query)
+        embedding_time = (time.time() - start_time) * 1000
         
         db = SessionLocal()
         try:
-            # Use parameterized query to prevent SQL injection
-            # pgvector <=> is cosine distance (0=identical, 2=opposite)
-            # Convert to similarity: 1 - (distance / 2) for normalized score
+            # Tune HNSW search for speed (lower = faster, less accurate)
+            db.execute(text("SET hnsw.ef_search = 20"))
+            
             embedding_str = "[" + ",".join(map(str, query_embedding)) + "]"
             
-            results = db.execute(
-                text("""
-                    SELECT id, content, source, section, title, act_type, extra_data,
-                           1 - (embedding <=> :query_embedding::vector) as similarity
-                    FROM document_embeddings
-                    ORDER BY embedding <=> :query_embedding::vector
-                    LIMIT :limit
-                """),
-                {
-                    "query_embedding": embedding_str,
-                    "limit": k
-                }
-            ).fetchall()
+            if use_hybrid:
+                # =================================================================
+                # HYBRID SEARCH: Combine keyword + vector for better results
+                # =================================================================
+                
+                # Extract keywords for full-text search
+                keywords = self._extract_search_keywords(query)
+                keyword_filter = " | ".join(keywords) if keywords else query
+                
+                # Hybrid query using PostgreSQL full-text search + vector similarity
+                # Uses Reciprocal Rank Fusion (RRF) to combine scores
+                results = db.execute(
+                    text("""
+                        WITH vector_search AS (
+                            SELECT id, content, source, section, title, act_type, extra_data,
+                                   1 - (embedding <=> :query_embedding::vector) as vector_score,
+                                   ROW_NUMBER() OVER (ORDER BY embedding <=> :query_embedding::vector) as vector_rank
+                            FROM document_embeddings
+                            ORDER BY embedding <=> :query_embedding::vector
+                            LIMIT :limit_expanded
+                        ),
+                        keyword_search AS (
+                            SELECT id, content, source, section, title, act_type, extra_data,
+                                   ts_rank_cd(to_tsvector('english', content), plainto_tsquery('english', :keyword_query)) as keyword_score,
+                                   ROW_NUMBER() OVER (ORDER BY ts_rank_cd(to_tsvector('english', content), plainto_tsquery('english', :keyword_query)) DESC) as keyword_rank
+                            FROM document_embeddings
+                            WHERE to_tsvector('english', content) @@ plainto_tsquery('english', :keyword_query)
+                            LIMIT :limit_expanded
+                        )
+                        SELECT 
+                            COALESCE(v.id, k.id) as id,
+                            COALESCE(v.content, k.content) as content,
+                            COALESCE(v.source, k.source) as source,
+                            COALESCE(v.section, k.section) as section,
+                            COALESCE(v.title, k.title) as title,
+                            COALESCE(v.act_type, k.act_type) as act_type,
+                            COALESCE(v.extra_data, k.extra_data) as extra_data,
+                            COALESCE(v.vector_score, 0) as vector_score,
+                            COALESCE(k.keyword_score, 0) as keyword_score,
+                            -- Reciprocal Rank Fusion (RRF) score
+                            COALESCE(1.0 / (60 + v.vector_rank), 0) + COALESCE(1.0 / (60 + k.keyword_rank), 0) as rrf_score
+                        FROM vector_search v
+                        FULL OUTER JOIN keyword_search k ON v.id = k.id
+                        ORDER BY rrf_score DESC
+                        LIMIT :limit
+                    """),
+                    {
+                        "query_embedding": embedding_str,
+                        "keyword_query": keyword_filter,
+                        "limit": k,
+                        "limit_expanded": k * 3  # Get more candidates for fusion
+                    }
+                ).fetchall()
+                
+                logger.debug(f"Hybrid search: embedding={embedding_time:.0f}ms, keywords={keywords}")
+            else:
+                # Pure vector search (fallback)
+                results = db.execute(
+                    text("""
+                        SELECT id, content, source, section, title, act_type, extra_data,
+                               1 - (embedding <=> :query_embedding::vector) as similarity
+                        FROM document_embeddings
+                        ORDER BY embedding <=> :query_embedding::vector
+                        LIMIT :limit
+                    """),
+                    {
+                        "query_embedding": embedding_str,
+                        "limit": k
+                    }
+                ).fetchall()
             
             # Convert to LangChain Documents
             documents = []
@@ -204,7 +277,8 @@ class PgVectorStore:
                     "section": row.section,
                     "title": row.title,
                     "act_type": row.act_type,
-                    "similarity": float(row.similarity) if row.similarity else 0
+                    "vector_score": float(row.vector_score) if hasattr(row, 'vector_score') and row.vector_score else 0,
+                    "keyword_score": float(row.keyword_score) if hasattr(row, 'keyword_score') and row.keyword_score else 0
                 })
                 
                 doc = Document(
@@ -213,14 +287,87 @@ class PgVectorStore:
                 )
                 documents.append(doc)
             
-            logger.debug(f"Found {len(documents)} similar documents")
+            total_time = (time.time() - start_time) * 1000
+            logger.debug(f"Hybrid search found {len(documents)} results in {total_time:.0f}ms")
             return documents
             
         except Exception as e:
-            logger.error(f"Similarity search failed: {e}")
-            return []
+            logger.error(f"Hybrid search failed: {e}")
+            # Fallback to simple vector search
+            logger.info("Falling back to simple vector search...")
+            return self._simple_vector_search(query, k, db)
         finally:
             db.close()
+    
+    def _extract_search_keywords(self, query: str) -> List[str]:
+        """
+        Extract important keywords from query for BM25/keyword matching.
+        
+        Viva Explanation:
+        - Removes stopwords (the, is, what, etc.)
+        - Extracts section/article numbers
+        - Returns keywords for full-text search
+        """
+        import re
+        
+        # Common stopwords to remove
+        stopwords = {
+            'what', 'is', 'the', 'a', 'an', 'of', 'in', 'for', 'to', 'as',
+            'can', 'i', 'do', 'how', 'under', 'about', 'with', 'are', 'be',
+            'my', 'me', 'if', 'when', 'where', 'which', 'who', 'why', 'this',
+            'that', 'these', 'those', 'does', 'did', 'has', 'have', 'had'
+        }
+        
+        # Clean and split query
+        words = re.sub(r'[^\w\s]', '', query.lower()).split()
+        
+        # Filter keywords
+        keywords = [w for w in words if w not in stopwords and len(w) > 2]
+        
+        # Extract section/article patterns (important for legal queries)
+        section_match = re.search(r'section\s*(\d+[A-Za-z]*)', query, re.IGNORECASE)
+        article_match = re.search(r'article\s*(\d+[A-Za-z]*)', query, re.IGNORECASE)
+        
+        if section_match:
+            keywords.extend([f"section", section_match.group(1)])
+        if article_match:
+            keywords.extend([f"article", article_match.group(1)])
+        
+        return list(set(keywords))  # Remove duplicates
+    
+    def _simple_vector_search(self, query: str, k: int, db) -> List[Document]:
+        """Simple vector-only search as fallback."""
+        query_embedding = self.embeddings.embed_query(query)
+        embedding_str = "[" + ",".join(map(str, query_embedding)) + "]"
+        
+        results = db.execute(
+            text("""
+                SELECT id, content, source, section, title, act_type, extra_data,
+                       1 - (embedding <=> :query_embedding::vector) as similarity
+                FROM document_embeddings
+                ORDER BY embedding <=> :query_embedding::vector
+                LIMIT :limit
+            """),
+            {
+                "query_embedding": embedding_str,
+                "limit": k
+            }
+        ).fetchall()
+        
+        documents = []
+        for row in results:
+            metadata = row.extra_data or {}
+            metadata.update({
+                "source": row.source,
+                "section": row.section,
+                "title": row.title,
+                "act_type": row.act_type,
+                "similarity": float(row.similarity) if row.similarity else 0
+            })
+            doc = Document(page_content=row.content, metadata=metadata)
+            documents.append(doc)
+        
+        return documents
     
     def similarity_search_with_score(
         self, 

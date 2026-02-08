@@ -1,6 +1,6 @@
 /**
  * NyayaSahay Mobile - Auth Screen
- * Pixel-perfect replica of web AuthModal.jsx
+ * Pixel-perfect replica of web AuthModal.jsx with responsive design
  */
 
 import { useState } from 'react';
@@ -14,14 +14,18 @@ import {
     Platform,
     ScrollView,
     ActivityIndicator,
+    Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Feather, AntDesign } from '@expo/vector-icons';
+import * as Crypto from 'expo-crypto';
 
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
-import { registerUser, loginUser, saveUser } from '../services/api';
+import { wp, hp, ms, screenSize } from '../constants/responsive';
+import { registerUser, loginUser, saveUser, getGoogleAuthUrl, exchangeGoogleCode } from '../services/api';
+
 
 export default function AuthScreen() {
     const router = useRouter();
@@ -36,6 +40,7 @@ export default function AuthScreen() {
     });
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
     const isSignIn = mode === 'signin';
@@ -105,6 +110,61 @@ export default function AuthScreen() {
         router.back();
     };
 
+    // Generate PKCE codes for Google OAuth
+    const generatePKCE = async () => {
+        const randomBytes = await Crypto.getRandomBytesAsync(32);
+        const codeVerifier = btoa(String.fromCharCode(...randomBytes))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=/g, '')
+            .substring(0, 43);
+
+        const hash = await Crypto.digestStringAsync(
+            Crypto.CryptoDigestAlgorithm.SHA256,
+            codeVerifier,
+            { encoding: Crypto.CryptoEncoding.BASE64 }
+        );
+        const codeChallenge = hash
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=/g, '');
+
+        return { codeVerifier, codeChallenge };
+    };
+
+    // Handle Google Sign In
+    const handleGoogleSignIn = async () => {
+        setError('');
+        setIsGoogleLoading(true);
+
+        try {
+            // Get OAuth URL from backend
+            const { auth_url, state } = await getGoogleAuthUrl();
+
+            // Generate PKCE
+            const { codeVerifier, codeChallenge } = await generatePKCE();
+
+            // Store PKCE for later (in memory for mobile)
+            global.oauthState = state;
+            global.oauthCodeVerifier = codeVerifier;
+
+            // Add PKCE to URL
+            const urlWithPKCE = `${auth_url}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+
+            // Open browser for OAuth
+            const supported = await Linking.canOpenURL(urlWithPKCE);
+            if (supported) {
+                await Linking.openURL(urlWithPKCE);
+            } else {
+                throw new Error('Cannot open Google login');
+            }
+        } catch (err) {
+            setError(err.message || 'Failed to connect to Google');
+        } finally {
+            setIsGoogleLoading(false);
+        }
+    };
+
     return (
         <KeyboardAvoidingView
             style={styles.container}
@@ -136,6 +196,29 @@ export default function AuthScreen() {
                             : 'Join NyayaSahay for personalized legal guidance'
                         }
                     </Text>
+                </View>
+
+                {/* Google OAuth Button */}
+                <Pressable
+                    style={[styles.googleBtn, isGoogleLoading && styles.googleBtnDisabled]}
+                    onPress={handleGoogleSignIn}
+                    disabled={isGoogleLoading || isLoading}
+                >
+                    {isGoogleLoading ? (
+                        <ActivityIndicator color="white" />
+                    ) : (
+                        <>
+                            <AntDesign name="google" size={18} color="white" />
+                            <Text style={styles.googleBtnText}>Continue with Google</Text>
+                        </>
+                    )}
+                </Pressable>
+
+                {/* Divider */}
+                <View style={styles.divider}>
+                    <View style={styles.dividerLine} />
+                    <Text style={styles.dividerText}>or continue with email</Text>
+                    <View style={styles.dividerLine} />
                 </View>
 
                 {/* Form */}
@@ -259,7 +342,14 @@ export default function AuthScreen() {
 
                 {/* Disclaimer */}
                 <Text style={styles.disclaimer}>
-                    By continuing, you agree to our Terms of Service and Privacy Policy
+                    By continuing, you agree to our{' '}
+                    <Text style={styles.legalLink} onPress={() => router.push('/terms')}>
+                        Terms of Service
+                    </Text>
+                    {' '}and{' '}
+                    <Text style={styles.legalLink} onPress={() => router.push('/privacy')}>
+                        Privacy Policy
+                    </Text>
                 </Text>
             </ScrollView>
         </KeyboardAvoidingView>
@@ -309,6 +399,45 @@ const styles = StyleSheet.create({
         color: COLORS.textMuted,
         textAlign: 'center',
         lineHeight: 22,
+    },
+
+    // Google OAuth Button
+    googleBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: SPACING.sm,
+        height: 52,
+        backgroundColor: COLORS.primary,
+        borderRadius: RADIUS.md,
+        marginBottom: SPACING.md,
+        ...SHADOWS.card,
+    },
+    googleBtnDisabled: {
+        opacity: 0.7,
+    },
+    googleBtnText: {
+        fontSize: 15,
+        fontFamily: 'Inter_600SemiBold',
+        color: 'white',
+    },
+
+    // Divider
+    divider: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.md,
+        marginBottom: SPACING.lg,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: COLORS.borderColor,
+    },
+    dividerText: {
+        fontSize: 13,
+        fontFamily: 'Inter_400Regular',
+        color: COLORS.textMuted,
     },
 
     // Form
@@ -410,5 +539,9 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginTop: SPACING.xl,
         lineHeight: 18,
+    },
+    legalLink: {
+        color: COLORS.primary,
+        fontFamily: 'Inter_500Medium',
     },
 });

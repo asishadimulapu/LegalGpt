@@ -9,6 +9,7 @@ import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
+import { wp, hp, ms, screenSize } from '../constants/responsive';
 
 const SECTIONS = [
     {
@@ -81,7 +82,7 @@ export default function PrivacyScreen() {
                 {/* Intro */}
                 <View style={styles.introCard}>
                     <Text style={styles.introText}>
-                        NyayaSahay ("we", "our", "us") is committed to protecting your privacy. 
+                        NyayaSahay ("we", "our", "us") is committed to protecting your privacy.
                         This policy explains how we collect, use, and safeguard your information.
                     </Text>
                 </View>

@@ -200,6 +200,49 @@ export async function loginUser(email, password) {
 }
 
 /**
+ * Get Google OAuth URL
+ */
+export async function getGoogleAuthUrl() {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/google/url`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to get Google auth URL');
+    }
+
+    return await response.json();
+}
+
+/**
+ * Exchange Google OAuth code for JWT token
+ */
+export async function exchangeGoogleCode(code, codeVerifier, state) {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/google/callback`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            code: code,
+            code_verifier: codeVerifier,
+            state: state,
+        }),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Google authentication failed');
+    }
+
+    return await response.json();
+}
+
+/**
  * Save user to SecureStore
  * @param {Object} userData - User data including token
  */
@@ -291,7 +334,7 @@ export async function analyzeDocument(documentContent, question, sessionId = nul
             document_content: documentContent,
             question: question,
         };
-        
+
         if (sessionId) requestBody.session_id = sessionId;
         if (filename) requestBody.document_filename = filename;
 
@@ -313,7 +356,7 @@ export async function analyzeDocument(documentContent, question, sessionId = nul
         }
 
         const data = await response.json();
-        
+
         // Build enhanced answer with legal context
         let enhancedAnswer = data.answer;
         if (data.legal_context && data.legal_context.length > 0) {
