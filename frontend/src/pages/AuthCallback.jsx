@@ -60,7 +60,9 @@ function AuthCallback({ onLoginSuccess }) {
                 }
 
                 // Step 4: Exchange code for tokens via backend
-                const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+                // In production, use same origin (empty string). In dev, use localhost
+                const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
+                    (import.meta.env.PROD ? '' : 'http://localhost:8000');
                 const response = await fetch(`${API_BASE_URL}/api/v1/auth/google/callback`, {
                     method: 'POST',
                     headers: {
