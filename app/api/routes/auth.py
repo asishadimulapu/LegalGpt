@@ -9,6 +9,7 @@ PRODUCTION NOTES:
 - Connection pool starvation is mitigated via proper session lifecycle
 """
 
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -390,7 +391,7 @@ class GoogleAuthURL(BaseModel):
 class GoogleCallback(BaseModel):
     """Request body for Google OAuth callback."""
     code: str
-    code_verifier: str
+    code_verifier: Optional[str] = None  # Optional for mobile OAuth flow
     state: str
 
 
@@ -402,17 +403,15 @@ class GoogleAuthResponse(BaseModel):
 
 
 @router.get("/google/url", response_model=GoogleAuthURL)
-async def get_google_oauth_url():
+async def get_google_oauth_url(source: Optional[str] = None):
     """
     Get Google OAuth URL for frontend redirect.
     
+    Args:
+        source: Optional source identifier. Use 'mobile' for mobile app flow.
+    
     Returns:
         GoogleAuthURL: OAuth URL and state for CSRF protection
-        
-    Viva Explanation:
-    - Generates a secure state parameter for CSRF protection
-    - Frontend will redirect user to this URL
-    - Google handles authentication and redirects back
     """
     if not settings.google_client_id:
         raise HTTPException(
@@ -421,7 +420,10 @@ async def get_google_oauth_url():
         )
     
     # Generate state for CSRF protection
-    state = secrets.token_urlsafe(32)
+    # Prefix with 'mobile_' for mobile app flow so the web callback
+    # knows to redirect back to the app via deep link
+    random_state = secrets.token_urlsafe(32)
+    state = f"mobile_{random_state}" if source == "mobile" else random_state
     
     # Build Google OAuth URL
     params = {
@@ -473,16 +475,20 @@ async def google_oauth_callback(
     try:
         # Step 1: Exchange authorization code for tokens
         async with httpx.AsyncClient() as client:
-            token_response = await client.post(
-                "https://oauth2.googleapis.com/token",
-                data={
+            token_data = {
                     "client_id": settings.google_client_id,
                     "client_secret": settings.google_client_secret,
                     "code": callback_data.code,
-                    "code_verifier": callback_data.code_verifier,
                     "grant_type": "authorization_code",
                     "redirect_uri": settings.google_redirect_uri
                 }
+            # Only include code_verifier if provided (not used in mobile flow)
+            if callback_data.code_verifier:
+                token_data["code_verifier"] = callback_data.code_verifier
+            
+            token_response = await client.post(
+                "https://oauth2.googleapis.com/token",
+                data=token_data
             )
         
         if token_response.status_code != 200:

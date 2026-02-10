@@ -34,6 +34,9 @@ function AuthCallback({ onLoginSuccess }) {
                 const state = searchParams.get('state');
                 const errorParam = searchParams.get('error');
 
+                // Detect mobile flow from state prefix (encoded by backend)
+                const isMobile = state && state.startsWith('mobile_');
+
                 // Check for Google OAuth errors
                 if (errorParam) {
                     throw new Error(`Google OAuth error: ${errorParam}`);
@@ -43,20 +46,28 @@ function AuthCallback({ onLoginSuccess }) {
                     throw new Error('Authorization code not found');
                 }
 
-                // Step 2: Validate state (CSRF protection)
-                const storedState = sessionStorage.getItem('oauth_state');
-                const codeVerifier = sessionStorage.getItem('oauth_code_verifier');
+                let codeVerifier = null;
 
-                // Clear storage immediately to prevent reuse
-                sessionStorage.removeItem('oauth_state');
-                sessionStorage.removeItem('oauth_code_verifier');
+                if (isMobile) {
+                    // Mobile flow: no sessionStorage available
+                    // Send without code_verifier - backend will handle it
+                    console.log('Mobile OAuth flow detected');
+                } else {
+                    // Web flow: validate state from sessionStorage
+                    const storedState = sessionStorage.getItem('oauth_state');
+                    codeVerifier = sessionStorage.getItem('oauth_code_verifier');
 
-                if (!storedState || state !== storedState) {
-                    throw new Error('Invalid state parameter. Please try logging in again.');
-                }
+                    // Clear storage immediately to prevent reuse
+                    sessionStorage.removeItem('oauth_state');
+                    sessionStorage.removeItem('oauth_code_verifier');
 
-                if (!codeVerifier) {
-                    throw new Error('Code verifier not found. Please try logging in again.');
+                    if (!storedState || state !== storedState) {
+                        throw new Error('Invalid state parameter. Please try logging in again.');
+                    }
+
+                    if (!codeVerifier) {
+                        throw new Error('Code verifier not found. Please try logging in again.');
+                    }
                 }
 
                 // Step 4: Exchange code for tokens via backend
@@ -82,7 +93,23 @@ function AuthCallback({ onLoginSuccess }) {
 
                 const data = await response.json();
 
-                // Step 5: Store user data and token
+                if (isMobile) {
+                    // Mobile flow: redirect back to app via deep link
+                    const deepLinkUrl = `nyayasahay://auth/callback?token=${encodeURIComponent(data.access_token)}&email=${encodeURIComponent(data.user.email)}&name=${encodeURIComponent(data.user.full_name || data.user.name)}&id=${encodeURIComponent(data.user.id)}`;
+
+                    setStatus('success');
+
+                    // Redirect to mobile app
+                    window.location.href = deepLinkUrl;
+
+                    // Fallback: show message if deep link doesn't work
+                    setTimeout(() => {
+                        setStatus('mobile_fallback');
+                    }, 3000);
+                    return;
+                }
+
+                // Web flow: store user data and redirect
                 const userData = {
                     email: data.user.email,
                     name: data.user.full_name,
@@ -142,6 +169,14 @@ function AuthCallback({ onLoginSuccess }) {
                         >
                             Return to Home
                         </button>
+                    </>
+                )}
+
+                {status === 'mobile_fallback' && (
+                    <>
+                        <div className="auth-callback-success">✓</div>
+                        <h2>Sign-in Successful!</h2>
+                        <p>Please return to the NyayaSahay app to continue.</p>
                     </>
                 )}
             </div>

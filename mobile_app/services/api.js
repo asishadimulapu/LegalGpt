@@ -203,7 +203,7 @@ export async function loginUser(email, password) {
  * Get Google OAuth URL
  */
 export async function getGoogleAuthUrl() {
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/google/url`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/google/url?source=mobile`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',

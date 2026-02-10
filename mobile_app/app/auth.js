@@ -14,13 +14,12 @@ import {
     Platform,
     ScrollView,
     ActivityIndicator,
+    Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons, Feather, AntDesign } from '@expo/vector-icons';
-import * as Crypto from 'expo-crypto';
-import * as WebBrowser from 'expo-web-browser';
 
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
 import { wp, hp, ms, screenSize } from '../constants/responsive';
@@ -109,29 +108,6 @@ export default function AuthScreen() {
     const handleClose = () => {
         router.back();
     };
-
-    // Generate PKCE codes for Google OAuth
-    const generatePKCE = async () => {
-        const randomBytes = await Crypto.getRandomBytesAsync(32);
-        const codeVerifier = btoa(String.fromCharCode(...randomBytes))
-            .replace(/\+/g, '-')
-            .replace(/\//g, '_')
-            .replace(/=/g, '')
-            .substring(0, 43);
-
-        const hash = await Crypto.digestStringAsync(
-            Crypto.CryptoDigestAlgorithm.SHA256,
-            codeVerifier,
-            { encoding: Crypto.CryptoEncoding.BASE64 }
-        );
-        const codeChallenge = hash
-            .replace(/\+/g, '-')
-            .replace(/\//g, '_')
-            .replace(/=/g, '');
-
-        return { codeVerifier, codeChallenge };
-    };
-
     // Handle Google Sign In
     const handleGoogleSignIn = async () => {
         setError('');
@@ -139,55 +115,60 @@ export default function AuthScreen() {
 
         try {
             // Get OAuth URL from backend
-            const { auth_url, state } = await getGoogleAuthUrl();
+            const { auth_url } = await getGoogleAuthUrl();
 
-            // Generate PKCE
-            const { codeVerifier, codeChallenge } = await generatePKCE();
+            // Add source=mobile to the redirect URI so the web callback knows
+            // to redirect back to the app via deep link instead of web flow
+            const oauthUrl = `${auth_url}&source=mobile`;
 
-            // Add PKCE to URL
-            const urlWithPKCE = `${auth_url}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+            // Set up deep link listener BEFORE opening browser
+            // When the web callback finishes, it redirects to nyayasahay://auth/callback?token=...
+            const linkingSubscription = Linking.addEventListener('url', async (event) => {
+                try {
+                    const url = new URL(event.url);
 
-            // Use in-app browser that captures redirect
-            // The redirect goes to https://law-gpt.app/auth/callback?code=...&state=...
-            const redirectUrl = 'https://law-gpt.app/auth/callback';
-            const result = await WebBrowser.openAuthSessionAsync(urlWithPKCE, redirectUrl);
+                    // Check if this is our auth callback
+                    if (url.hostname === 'auth' || url.pathname.includes('auth/callback')) {
+                        const token = url.searchParams.get('token');
+                        const email = url.searchParams.get('email');
+                        const name = url.searchParams.get('name');
+                        const id = url.searchParams.get('id');
 
-            if (result.type === 'success' && result.url) {
-                // Parse the callback URL to extract code and state
-                const url = new URL(result.url);
-                const code = url.searchParams.get('code');
-                const returnedState = url.searchParams.get('state');
+                        if (token) {
+                            // Save user data
+                            await saveUser({ token, email, name, id });
 
-                // Validate state
-                if (returnedState !== state) {
-                    throw new Error('Invalid state parameter - possible CSRF attack');
+                            // Navigate to chat
+                            router.replace('/chat');
+                        } else {
+                            setError('Authentication failed - no token received');
+                        }
+                    }
+                } catch (e) {
+                    setError(e.message || 'Failed to process sign-in');
+                } finally {
+                    linkingSubscription.remove();
+                    setIsGoogleLoading(false);
                 }
+            });
 
-                if (!code) {
-                    throw new Error('No authorization code received from Google');
-                }
-
-                // Exchange code for JWT token
-                const authResult = await exchangeGoogleCode(code, codeVerifier, state);
-
-                // Save user data
-                await saveUser({
-                    token: authResult.access_token,
-                    email: authResult.user.email,
-                    name: authResult.user.name,
-                    id: authResult.user.id,
-                });
-
-                // Navigate to chat
-                router.replace('/chat');
-            } else if (result.type === 'cancel') {
-                // User cancelled - no error needed
+            // Open browser for OAuth
+            const supported = await Linking.canOpenURL(oauthUrl);
+            if (supported) {
+                await Linking.openURL(oauthUrl);
             } else {
-                throw new Error('Google sign-in was not completed');
+                linkingSubscription.remove();
+                throw new Error('Cannot open Google login');
             }
+
+            // Set a timeout to clean up if user doesn't return
+            setTimeout(() => {
+                linkingSubscription.remove();
+                setIsGoogleLoading(false);
+            }, 120000); // 2 minute timeout
+
         } catch (err) {
             setError(err.message || 'Failed to connect to Google');
-        } finally {
             setIsGoogleLoading(false);
         }
     };
