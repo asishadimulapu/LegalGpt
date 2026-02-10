@@ -14,13 +14,13 @@ import {
     Platform,
     ScrollView,
     ActivityIndicator,
-    Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons, Feather, AntDesign } from '@expo/vector-icons';
 import * as Crypto from 'expo-crypto';
+import * as WebBrowser from 'expo-web-browser';
 
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
 import { wp, hp, ms, screenSize } from '../constants/responsive';
@@ -144,19 +144,46 @@ export default function AuthScreen() {
             // Generate PKCE
             const { codeVerifier, codeChallenge } = await generatePKCE();
 
-            // Store PKCE for later (in memory for mobile)
-            global.oauthState = state;
-            global.oauthCodeVerifier = codeVerifier;
-
             // Add PKCE to URL
             const urlWithPKCE = `${auth_url}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
-            // Open browser for OAuth
-            const supported = await Linking.canOpenURL(urlWithPKCE);
-            if (supported) {
-                await Linking.openURL(urlWithPKCE);
+            // Use in-app browser that captures redirect
+            // The redirect goes to https://law-gpt.app/auth/callback?code=...&state=...
+            const redirectUrl = 'https://law-gpt.app/auth/callback';
+            const result = await WebBrowser.openAuthSessionAsync(urlWithPKCE, redirectUrl);
+
+            if (result.type === 'success' && result.url) {
+                // Parse the callback URL to extract code and state
+                const url = new URL(result.url);
+                const code = url.searchParams.get('code');
+                const returnedState = url.searchParams.get('state');
+
+                // Validate state
+                if (returnedState !== state) {
+                    throw new Error('Invalid state parameter - possible CSRF attack');
+                }
+
+                if (!code) {
+                    throw new Error('No authorization code received from Google');
+                }
+
+                // Exchange code for JWT token
+                const authResult = await exchangeGoogleCode(code, codeVerifier, state);
+
+                // Save user data
+                await saveUser({
+                    token: authResult.access_token,
+                    email: authResult.user.email,
+                    name: authResult.user.name,
+                    id: authResult.user.id,
+                });
+
+                // Navigate to chat
+                router.replace('/chat');
+            } else if (result.type === 'cancel') {
+                // User cancelled - no error needed
             } else {
-                throw new Error('Cannot open Google login');
+                throw new Error('Google sign-in was not completed');
             }
         } catch (err) {
             setError(err.message || 'Failed to connect to Google');
