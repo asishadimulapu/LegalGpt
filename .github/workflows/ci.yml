@@ -58,7 +58,8 @@ jobs:
       - name: Check imports
         run: |
           python -c "from app.config import settings; print('✓ Config imports OK')"
-          python -c "from app.core.embeddings import get_embeddings; print('✓ Embeddings import OK')"
+          python -c "from app.core.prompts import RAG_SYSTEM_PROMPT; print('✓ Prompts import OK')"
+          python -c "from app.schemas.chat import LegalSource; print('✓ Schemas import OK')"
 
   # ---------------------------------------------------------------------------
   # Frontend Build

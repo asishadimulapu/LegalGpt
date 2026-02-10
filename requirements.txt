@@ -48,10 +48,13 @@ psycopg2-binary==2.9.9
 sqlalchemy==2.0.25
 redis==5.0.1
 
-# LLM Providers
+# LLM Providers (active)
 groovy==0.1.2
-google-generativeai==0.4.1
-langchain-google-genai==1.0.1
+langchain-groq>=0.0.1
+# Optional LLM providers (install manually if switching from Groq):
+# pip install langchain-openai==0.0.6
+# pip install langchain-google-genai==1.0.1
+# pip install google-generativeai==0.4.1
 
 # Utilities
 python-dotenv==1.0.0

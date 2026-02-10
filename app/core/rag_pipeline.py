@@ -14,8 +14,8 @@ import time
 from typing import List, Optional, Tuple
 import logging
 
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_openai import ChatOpenAI
+# LLM provider imports are lazy-loaded inside get_llm() to avoid
+# crashes when unused provider packages have version conflicts
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
@@ -50,6 +50,7 @@ def get_llm():
         if not settings.openai_api_key:
             raise ValueError("OPENAI_API_KEY is required")
         
+        from langchain_openai import ChatOpenAI
         return ChatOpenAI(
             api_key=settings.openai_api_key,
             model="gpt-4-turbo-preview",
@@ -62,6 +63,7 @@ def get_llm():
         if not settings.google_api_key:
             raise ValueError("GOOGLE_API_KEY is required")
         
+        from langchain_google_genai import ChatGoogleGenerativeAI
         return ChatGoogleGenerativeAI(
             google_api_key=settings.google_api_key,
             model="gemini-1.5-flash",
@@ -74,6 +76,7 @@ def get_llm():
         if not settings.openrouter_api_key:
             raise ValueError("OPENROUTER_API_KEY is required")
         
+        from langchain_openai import ChatOpenAI
         return ChatOpenAI(
             api_key=settings.openrouter_api_key,
             base_url="https://openrouter.ai/api/v1",
