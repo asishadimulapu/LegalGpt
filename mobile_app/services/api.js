@@ -200,37 +200,17 @@ export async function loginUser(email, password) {
 }
 
 /**
- * Get Google OAuth URL
+ * Exchange Google access token for our JWT (mobile flow)
+ * Uses the /google/mobile-auth endpoint
  */
-export async function getGoogleAuthUrl() {
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/google/url?source=mobile`, {
-        method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    });
-
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || 'Failed to get Google auth URL');
-    }
-
-    return await response.json();
-}
-
-/**
- * Exchange Google OAuth code for JWT token
- */
-export async function exchangeGoogleCode(code, codeVerifier, state) {
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/google/callback`, {
+export async function exchangeGoogleToken(googleAccessToken) {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/google/mobile-auth`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            code: code,
-            code_verifier: codeVerifier,
-            state: state,
+            access_token: googleAccessToken,
         }),
     });
 

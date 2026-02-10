@@ -3,7 +3,7 @@
  * Pixel-perfect replica of web AuthModal.jsx with responsive design
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -14,16 +14,24 @@ import {
     Platform,
     ScrollView,
     ActivityIndicator,
-    Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons, Feather, AntDesign } from '@expo/vector-icons';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
 
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
 import { wp, hp, ms, screenSize } from '../constants/responsive';
-import { registerUser, loginUser, saveUser, getGoogleAuthUrl, exchangeGoogleCode } from '../services/api';
+import { registerUser, loginUser, saveUser, exchangeGoogleToken } from '../services/api';
+
+// Required for expo-auth-session to work in Expo Go
+WebBrowser.maybeCompleteAuthSession();
+
+// Google OAuth Client IDs
+const GOOGLE_WEB_CLIENT_ID = '635358878968-rcrmogrhiku17clhatovbg009flqrlng.apps.googleusercontent.com';
+const GOOGLE_ANDROID_CLIENT_ID = '635358878968-3ft2j10dnqsio7s71hrsioei5ci4vsop.apps.googleusercontent.com';
 
 
 export default function AuthScreen() {
@@ -41,6 +49,50 @@ export default function AuthScreen() {
     const [isLoading, setIsLoading] = useState(false);
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+
+    // Google OAuth hook
+    const [request, response, promptAsync] = Google.useAuthRequest({
+        androidClientId: GOOGLE_ANDROID_CLIENT_ID,
+        webClientId: GOOGLE_WEB_CLIENT_ID,
+    });
+
+    // Handle Google OAuth response
+    useEffect(() => {
+        if (response?.type === 'success') {
+            const { authentication } = response;
+            if (authentication?.accessToken) {
+                handleGoogleToken(authentication.accessToken);
+            } else {
+                setError('No access token received from Google');
+                setIsGoogleLoading(false);
+            }
+        } else if (response?.type === 'error') {
+            setError(response.error?.message || 'Google sign-in failed');
+            setIsGoogleLoading(false);
+        } else if (response?.type === 'dismiss') {
+            setIsGoogleLoading(false);
+        }
+    }, [response]);
+
+    // Exchange Google token for our JWT
+    const handleGoogleToken = async (googleAccessToken) => {
+        try {
+            const authResult = await exchangeGoogleToken(googleAccessToken);
+
+            await saveUser({
+                token: authResult.access_token,
+                email: authResult.user.email,
+                name: authResult.user.full_name || authResult.user.name,
+                id: authResult.user.id,
+            });
+
+            router.replace('/chat');
+        } catch (err) {
+            setError(err.message || 'Failed to sign in with Google');
+        } finally {
+            setIsGoogleLoading(false);
+        }
+    };
 
     const isSignIn = mode === 'signin';
 
@@ -108,65 +160,12 @@ export default function AuthScreen() {
     const handleClose = () => {
         router.back();
     };
-    // Handle Google Sign In
+    // Handle Google Sign In - triggers the expo-auth-session flow
     const handleGoogleSignIn = async () => {
         setError('');
         setIsGoogleLoading(true);
-
         try {
-            // Get OAuth URL from backend
-            const { auth_url } = await getGoogleAuthUrl();
-
-            // Add source=mobile to the redirect URI so the web callback knows
-            // to redirect back to the app via deep link instead of web flow
-            const oauthUrl = `${auth_url}&source=mobile`;
-
-            // Set up deep link listener BEFORE opening browser
-            // When the web callback finishes, it redirects to nyayasahay://auth/callback?token=...
-            const linkingSubscription = Linking.addEventListener('url', async (event) => {
-                try {
-                    const url = new URL(event.url);
-
-                    // Check if this is our auth callback
-                    if (url.hostname === 'auth' || url.pathname.includes('auth/callback')) {
-                        const token = url.searchParams.get('token');
-                        const email = url.searchParams.get('email');
-                        const name = url.searchParams.get('name');
-                        const id = url.searchParams.get('id');
-
-                        if (token) {
-                            // Save user data
-                            await saveUser({ token, email, name, id });
-
-                            // Navigate to chat
-                            router.replace('/chat');
-                        } else {
-                            setError('Authentication failed - no token received');
-                        }
-                    }
-                } catch (e) {
-                    setError(e.message || 'Failed to process sign-in');
-                } finally {
-                    linkingSubscription.remove();
-                    setIsGoogleLoading(false);
-                }
-            });
-
-            // Open browser for OAuth
-            const supported = await Linking.canOpenURL(oauthUrl);
-            if (supported) {
-                await Linking.openURL(oauthUrl);
-            } else {
-                linkingSubscription.remove();
-                throw new Error('Cannot open Google login');
-            }
-
-            // Set a timeout to clean up if user doesn't return
-            setTimeout(() => {
-                linkingSubscription.remove();
-                setIsGoogleLoading(false);
-            }, 120000); // 2 minute timeout
-
+            await promptAsync();
         } catch (err) {
             setError(err.message || 'Failed to connect to Google');
             setIsGoogleLoading(false);

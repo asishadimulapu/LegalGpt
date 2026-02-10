@@ -612,3 +612,110 @@ async def google_oauth_callback(
             detail="Authentication failed. Please try again."
         )
 
+
+class GoogleMobileAuth(BaseModel):
+    """Request body for mobile Google auth (access token flow)."""
+    access_token: str
+
+
+@router.post("/google/mobile-auth", response_model=GoogleAuthResponse)
+async def google_mobile_auth(
+    auth_data: GoogleMobileAuth,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Mobile Google OAuth - accepts Google access token directly.
+    
+    Used by mobile apps (Expo) that get an access token from Google
+    via expo-auth-session, bypassing the authorization code exchange.
+    
+    Flow:
+    1. Mobile app gets Google access token via expo-auth-session
+    2. Sends access token to this endpoint
+    3. We verify by fetching user info from Google
+    4. Create/find user and return our JWT
+    """
+    client_ip = get_client_ip(request)
+    
+    try:
+        # Verify the access token by fetching user info from Google
+        async with httpx.AsyncClient() as client:
+            userinfo_response = await client.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {auth_data.access_token}"}
+            )
+        
+        if userinfo_response.status_code != 200:
+            logger.error(f"Google userinfo failed: {userinfo_response.text}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid Google access token"
+            )
+        
+        google_user = userinfo_response.json()
+        google_id = google_user.get("id")
+        email = google_user.get("email")
+        name = google_user.get("name", "")
+        picture = google_user.get("picture")
+        
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email not provided by Google"
+            )
+        
+        # Find or create user (same logic as web OAuth)
+        user = UserCRUD.get_by_google_id(db, google_id)
+        
+        if not user:
+            user = UserCRUD.get_by_email(db, email)
+            
+            if user:
+                user = UserCRUD.link_google_account(db, user, google_id, picture)
+                logger.info(f"Mobile: Linked Google account to existing user: {email}")
+            else:
+                user = UserCRUD.create_google_user(
+                    db=db,
+                    email=email,
+                    full_name=name,
+                    google_id=google_id,
+                    picture_url=picture
+                )
+                logger.info(f"Mobile: Created new Google OAuth user: {email}")
+        
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is disabled"
+            )
+        
+        AuditLogger.log_login(
+            db=db,
+            user_id=user.id,
+            ip_address=client_ip,
+            user_agent=request.headers.get("User-Agent"),
+            success=True
+        )
+        
+        access_token = create_access_token(subject=user.id)
+        
+        return GoogleAuthResponse(
+            access_token=access_token,
+            user=UserResponse(
+                id=user.id,
+                email=user.email,
+                full_name=user.full_name,
+                is_active=user.is_active,
+                created_at=user.created_at
+            )
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Mobile Google OAuth error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Authentication failed. Please try again."
+        )
