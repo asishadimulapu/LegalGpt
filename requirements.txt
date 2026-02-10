@@ -1,47 +1,63 @@
+# =============================================================================
+# Indian Law RAG Chatbot - Requirements
+# Generated from actual installed versions to prevent CI/CD conflicts
+# =============================================================================
+
 # Core API Framework
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
 pydantic==2.5.3
 pydantic-settings==2.1.0
+starlette==0.35.1
 
 # Security & Cryptography
-cryptography>=44.0.1
+cryptography>=42.0.5
 pyjwt==2.8.0
-python-jose[cryptography]>=3.5.0
+python-jose[cryptography]>=3.3.0
 bcrypt==4.1.2
 argon2-cffi==23.1.0
 slowapi==0.1.9
+passlib==1.7.4
 
 # RAG & Vector Database
 chromadb==0.4.22
 sentence-transformers==2.3.1
 langchain==0.1.4
 langchain-community==0.0.16
+langchain-core==0.1.23
+faiss-cpu==1.8.0
+pgvector==0.4.2
 
 # Document Processing
 pypdf2==3.0.1
 python-docx==1.1.0
 python-multipart==0.0.6
+pdfplumber==0.10.3
 
 # Machine Learning & Embeddings
 torch==2.1.2
 transformers==4.36.2
 numpy==1.26.3
+tokenizers==0.15.2
 
 # Indian Legal NLP (optional)
 indic-nlp-library==0.92
 
-# Database & Caching
-redis==5.0.1
-pymongo==4.6.1
+# Database
 psycopg2-binary==2.9.9
 sqlalchemy==2.0.25
+redis==5.0.1
+
+# LLM Providers
+groovy==0.1.2
+google-generativeai==0.4.1
 
 # Utilities
 python-dotenv==1.0.0
 requests==2.31.0
 beautifulsoup4==4.12.3
 tqdm==4.66.1
+httpx==0.27.0
 
 # Logging & Monitoring
 python-json-logger==2.0.7
@@ -50,9 +66,13 @@ python-json-logger==2.0.7
 itsdangerous==2.1.2
 pyotp==2.9.0
 
+# Google OAuth
+google-auth==2.43.0
+google-auth-oauthlib==0.4.6
+requests-oauthlib==2.0.0
+
 # Testing
-pytest==8.0.0
-pytest-cov==4.1.0
-pytest-asyncio==0.23.3
-httpx==0.26.0
-coverage==7.4.0
+pytest>=8.0.0
+pytest-cov>=4.1.0
+pytest-asyncio>=0.23.3
+coverage>=7.4.0
