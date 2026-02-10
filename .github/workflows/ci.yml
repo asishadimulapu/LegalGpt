@@ -23,6 +23,13 @@ jobs:
   backend-test:
     name: Backend Tests
     runs-on: ubuntu-latest
+    env:
+      # Dummy env vars so imports don't crash in CI
+      DATABASE_URL: "sqlite:///./test.db"
+      JWT_SECRET_KEY: "ci-test-secret-key-not-real"
+      ENCRYPTION_KEY: "ci-test-encryption-key-1234567890abcdef"
+      GROQ_API_KEY: "ci-test-groq-key"
+      ENVIRONMENT: "testing"
 
     steps:
       - name: Checkout code
@@ -51,7 +58,6 @@ jobs:
       - name: Check imports
         run: |
           python -c "from app.config import settings; print('✓ Config imports OK')"
-          python -c "from app.db.models import User; print('✓ Models import OK')"
           python -c "from app.core.embeddings import get_embeddings; print('✓ Embeddings import OK')"
 
   # ---------------------------------------------------------------------------

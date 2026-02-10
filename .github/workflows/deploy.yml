@@ -70,9 +70,11 @@ jobs:
             # 5. Restart backend
             echo "🔄 Restarting backend..."
             sudo pkill -f 'uvicorn app.main:app' || true
-            sleep 2
-            nohup python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /home/azureuser/legalgpt.log 2>&1 &
-            sleep 8
+            sleep 3
+            # Use setsid to detach from SSH session so process survives
+            setsid nohup python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /home/azureuser/legalgpt.log 2>&1 &
+            disown
+            sleep 15
 
             # 6. Health check
             echo "🏥 Running health check..."
