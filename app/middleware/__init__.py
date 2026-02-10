@@ -381,7 +381,6 @@ def _cleanup_old_endpoint_buckets() -> None:
     Called periodically when new entries are added.
     Uses the same TTL as RateLimitMiddleware for consistency.
     """
-    global _endpoint_buckets
     
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(minutes=BUCKET_TTL_MINUTES)
