@@ -35,7 +35,6 @@ jobs:
           timeout: 120s
           command_timeout: 10m
           script: |
-            set -e
             echo "=========================================="
             echo "🚀 Starting deployment at $(date)"
             echo "=========================================="
