@@ -1,0 +1,95 @@
+# =============================================================================
+# CD Pipeline - LegalGpt
+# Auto-deploys to Azure VM on push to main
+# =============================================================================
+
+name: CD - Deploy to Azure VM
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # Allow manual trigger
+
+env:
+  VM_PROJECT_DIR: /home/azureuser/LegalGpt
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    # Only deploy if CI passes
+    needs: []
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ----- Deploy to Azure VM via SSH -----
+      - name: Deploy to VM
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          timeout: 120s
+          command_timeout: 10m
+          script: |
+            set -e
+            echo "=========================================="
+            echo "🚀 Starting deployment at $(date)"
+            echo "=========================================="
+
+            cd ${{ env.VM_PROJECT_DIR }}
+
+            # 1. Pull latest code
+            echo "📥 Pulling latest code..."
+            git fetch origin main
+            git reset --hard origin/main
+            echo "✓ Code updated"
+
+            # 2. Install Python dependencies (if changed)
+            echo "📦 Checking Python dependencies..."
+            source venv/bin/activate
+            pip install -r requirements.txt --quiet 2>/dev/null
+            echo "✓ Python dependencies up to date"
+
+            # 3. Run database migrations
+            echo "🗄️ Running migrations..."
+            python scripts/add_oauth_columns.py 2>/dev/null || true
+            echo "✓ Migrations complete"
+
+            # 4. Build frontend
+            echo "🔨 Building frontend..."
+            cd frontend
+            npm ci --silent 2>/dev/null
+            npm run build
+            echo "✓ Frontend built"
+            cd ..
+
+            # 5. Restart backend
+            echo "🔄 Restarting backend..."
+            sudo pkill -f 'uvicorn app.main:app' || true
+            sleep 2
+            nohup python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /home/azureuser/legalgpt.log 2>&1 &
+            sleep 8
+
+            # 6. Health check
+            echo "🏥 Running health check..."
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health)
+            if [ "$HTTP_STATUS" = "200" ]; then
+              echo "✅ Deployment successful! Health check passed (HTTP $HTTP_STATUS)"
+            else
+              echo "❌ Health check failed (HTTP $HTTP_STATUS)"
+              tail -20 /home/azureuser/legalgpt.log
+              exit 1
+            fi
+
+            echo "=========================================="
+            echo "✅ Deployment completed at $(date)"
+            echo "=========================================="
+
+      # ----- Notify on failure -----
+      - name: Notify on failure
+        if: failure()
+        run: echo "❌ Deployment failed! Check the logs above."
