@@ -66,25 +66,11 @@ jobs:
             echo "✓ Frontend built"
             cd ..
 
-            # 5. Restart backend
+            # 5. Restart backend using helper script
+            # (avoids pkill -f self-matching issue in SSH sessions)
             echo "🔄 Restarting backend..."
-            sudo pkill -f 'uvicorn app.main:app' || true
-            sleep 3
-            # Use setsid to detach from SSH session so process survives
-            setsid nohup python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /home/azureuser/legalgpt.log 2>&1 &
-            disown
-            sleep 15
-
-            # 6. Health check
-            echo "🏥 Running health check..."
-            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health)
-            if [ "$HTTP_STATUS" = "200" ]; then
-              echo "✅ Deployment successful! Health check passed (HTTP $HTTP_STATUS)"
-            else
-              echo "❌ Health check failed (HTTP $HTTP_STATUS)"
-              tail -20 /home/azureuser/legalgpt.log
-              exit 1
-            fi
+            chmod +x scripts/restart_backend.sh
+            bash scripts/restart_backend.sh
 
             echo "=========================================="
             echo "✅ Deployment completed at $(date)"
