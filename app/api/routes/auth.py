@@ -24,6 +24,7 @@ from app.utils.audit import AuditLogger
 import logging
 import json
 import os
+import base64
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -403,12 +404,13 @@ class GoogleAuthResponse(BaseModel):
 
 
 @router.get("/google/url", response_model=GoogleAuthURL)
-async def get_google_oauth_url(source: Optional[str] = None):
+async def get_google_oauth_url(source: Optional[str] = None, mobile_redirect: Optional[str] = None):
     """
     Get Google OAuth URL for frontend redirect.
     
     Args:
         source: Optional source identifier. Use 'mobile' for mobile app flow.
+        mobile_redirect: Optional redirect URI for mobile app deep link callback.
     
     Returns:
         GoogleAuthURL: OAuth URL and state for CSRF protection
@@ -420,10 +422,18 @@ async def get_google_oauth_url(source: Optional[str] = None):
         )
     
     # Generate state for CSRF protection
-    # Prefix with 'mobile_' for mobile app flow so the web callback
-    # knows to redirect back to the app via deep link
     random_state = secrets.token_urlsafe(32)
-    state = f"mobile_{random_state}" if source == "mobile" else random_state
+    
+    if source == "mobile":
+        if mobile_redirect:
+            # Encode redirect URI in state: mobile.<base64url(redirect)>.<random>
+            # Uses '.' separator which is safe (not in base64url or token_urlsafe alphabet)
+            redirect_b64 = base64.urlsafe_b64encode(mobile_redirect.encode()).decode().rstrip('=')
+            state = f"mobile.{redirect_b64}.{random_state}"
+        else:
+            state = f"mobile_{random_state}"
+    else:
+        state = random_state
     
     # Build Google OAuth URL
     params = {

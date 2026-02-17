@@ -19,20 +19,15 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialCommunityIcons, Feather, AntDesign } from '@expo/vector-icons';
-import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
 import { wp, hp, ms, screenSize } from '../constants/responsive';
-import { registerUser, loginUser, saveUser, exchangeGoogleToken } from '../services/api';
+import { registerUser, loginUser, saveUser } from '../services/api';
 
-// Required for expo-auth-session to work in Expo Go
-WebBrowser.maybeCompleteAuthSession();
-
-// Google OAuth Client IDs
-const GOOGLE_WEB_CLIENT_ID = '635358878968-rcrmogrhiku17clhatovbg009flqrlng.apps.googleusercontent.com';
-const GOOGLE_ANDROID_CLIENT_ID = '635358878968-3ft2j10dnqsio7s71hrsioei5ci4vsop.apps.googleusercontent.com';
-
+// API base URL (same as api.js)
+const API_BASE_URL = 'https://law-gpt.app';
 
 export default function AuthScreen() {
     const router = useRouter();
@@ -50,44 +45,74 @@ export default function AuthScreen() {
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
-    // Google OAuth hook
-    const [request, response, promptAsync] = Google.useAuthRequest({
-        androidClientId: GOOGLE_ANDROID_CLIENT_ID,
-        webClientId: GOOGLE_WEB_CLIENT_ID,
-    });
-
-    // Handle Google OAuth response
-    useEffect(() => {
-        if (response?.type === 'success') {
-            const { authentication } = response;
-            if (authentication?.accessToken) {
-                handleGoogleToken(authentication.accessToken);
-            } else {
-                setError('No access token received from Google');
-                setIsGoogleLoading(false);
-            }
-        } else if (response?.type === 'error') {
-            setError(response.error?.message || 'Google sign-in failed');
-            setIsGoogleLoading(false);
-        } else if (response?.type === 'dismiss') {
-            setIsGoogleLoading(false);
-        }
-    }, [response]);
-
-    // Exchange Google token for our JWT
-    const handleGoogleToken = async (googleAccessToken) => {
+    // Handle Google Sign In via web-based flow
+    // Flow:
+    // 1. Generate return URL using Linking.createURL (works in Expo Go & standalone)
+    // 2. Fetch Google OAuth URL from backend, passing mobile_redirect
+    // 3. Backend encodes redirect in state: mobile.<b64(redirect)>.<token>
+    // 4. Open Google sign-in in browser via WebBrowser.openAuthSessionAsync
+    // 5. After auth, Google redirects to law-gpt.app/auth/callback
+    // 6. Callback decodes redirect from state, redirects to app via deep link
+    // 7. openAuthSessionAsync detects the redirect and returns the URL
+    // 8. App parses token from URL and saves user
+    const handleGoogleSignIn = async () => {
+        setError('');
+        setIsGoogleLoading(true);
         try {
-            const authResult = await exchangeGoogleToken(googleAccessToken);
+            // Generate the correct return URL for this environment
+            // Expo Go: exp://192.168.x.x:8081/--/auth/callback
+            // Standalone build: nyayasahay://auth/callback
+            const returnUrl = Linking.createURL('auth/callback');
+            console.log('📱 Return URL:', returnUrl);
 
-            await saveUser({
-                token: authResult.access_token,
-                email: authResult.user.email,
-                name: authResult.user.full_name || authResult.user.name,
-                id: authResult.user.id,
-            });
+            // Step 1: Get the Google OAuth URL from backend
+            const response = await fetch(
+                `${API_BASE_URL}/api/v1/auth/google/url?source=mobile&mobile_redirect=${encodeURIComponent(returnUrl)}`
+            );
+            if (!response.ok) {
+                throw new Error('Failed to get Google sign-in URL');
+            }
+            const data = await response.json();
+            const googleAuthUrl = data.auth_url;
 
-            router.replace('/chat');
+            if (!googleAuthUrl) {
+                console.error('Backend response:', JSON.stringify(data));
+                throw new Error('No auth URL received from backend');
+            }
+
+            console.log('🔗 Opening Google OAuth...');
+
+            // Step 2: Open Google OAuth in system browser
+            // openAuthSessionAsync will detect when browser navigates to returnUrl
+            const result = await WebBrowser.openAuthSessionAsync(
+                googleAuthUrl,
+                returnUrl
+            );
+
+            // Step 3: Parse the deep link result
+            if (result.type === 'success' && result.url) {
+                console.log('✅ Auth returned:', result.url);
+                const url = new URL(result.url);
+                const token = url.searchParams.get('token');
+                const email = url.searchParams.get('email');
+                const name = url.searchParams.get('name');
+                const id = url.searchParams.get('id');
+
+                if (token) {
+                    // Step 4: Save user and navigate to chat
+                    await saveUser({ token, email, name, id });
+                    router.replace('/chat');
+                } else {
+                    throw new Error('No token received from authentication');
+                }
+            } else if (result.type === 'cancel' || result.type === 'dismiss') {
+                // User cancelled - do nothing
+                console.log('Auth cancelled/dismissed');
+            } else {
+                throw new Error('Authentication was not completed');
+            }
         } catch (err) {
+            console.error('Google Sign In Error:', err);
             setError(err.message || 'Failed to sign in with Google');
         } finally {
             setIsGoogleLoading(false);
@@ -159,17 +184,6 @@ export default function AuthScreen() {
 
     const handleClose = () => {
         router.back();
-    };
-    // Handle Google Sign In - triggers the expo-auth-session flow
-    const handleGoogleSignIn = async () => {
-        setError('');
-        setIsGoogleLoading(true);
-        try {
-            await promptAsync();
-        } catch (err) {
-            setError(err.message || 'Failed to connect to Google');
-            setIsGoogleLoading(false);
-        }
     };
 
     return (

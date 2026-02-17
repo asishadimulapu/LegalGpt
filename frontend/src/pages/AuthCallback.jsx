@@ -35,7 +35,9 @@ function AuthCallback({ onLoginSuccess }) {
                 const errorParam = searchParams.get('error');
 
                 // Detect mobile flow from state prefix (encoded by backend)
-                const isMobile = state && state.startsWith('mobile_');
+                // New format: mobile.<base64url(redirect)>.<random_token>
+                // Legacy format: mobile_<random_token>
+                const isMobile = state && (state.startsWith('mobile.') || state.startsWith('mobile_'));
 
                 // Check for Google OAuth errors
                 if (errorParam) {
@@ -94,12 +96,33 @@ function AuthCallback({ onLoginSuccess }) {
                 const data = await response.json();
 
                 if (isMobile) {
-                    // Mobile flow: redirect back to app via deep link
-                    const deepLinkUrl = `nyayasahay://auth/callback?token=${encodeURIComponent(data.access_token)}&email=${encodeURIComponent(data.user.email)}&name=${encodeURIComponent(data.user.full_name || data.user.name)}&id=${encodeURIComponent(data.user.id)}`;
+                    // Extract mobile redirect URI from state
+                    let mobileRedirectBase = 'nyayasahay://auth/callback'; // Default fallback
+
+                    if (state.startsWith('mobile.')) {
+                        try {
+                            // State format: mobile.<base64url(redirect)>.<random_token>
+                            const parts = state.split('.');
+                            if (parts.length >= 2) {
+                                let b64 = parts[1];
+                                // Restore base64 padding
+                                while (b64.length % 4 !== 0) b64 += '=';
+                                // Decode base64url → standard base64 → string
+                                const decoded = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+                                mobileRedirectBase = decoded;
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse mobile redirect from state:', e);
+                        }
+                    }
+
+                    // Build deep link URL with auth data
+                    const deepLinkUrl = `${mobileRedirectBase}?token=${encodeURIComponent(data.access_token)}&email=${encodeURIComponent(data.user.email)}&name=${encodeURIComponent(data.user.full_name || data.user.name)}&id=${encodeURIComponent(data.user.id)}`;
+                    console.log('Mobile redirect URL:', deepLinkUrl);
 
                     setStatus('success');
 
-                    // Redirect to mobile app
+                    // Redirect to mobile app via deep link
                     window.location.href = deepLinkUrl;
 
                     // Fallback: show message if deep link doesn't work
