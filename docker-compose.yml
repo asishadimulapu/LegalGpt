@@ -36,11 +36,11 @@ services:
     networks:
       - nyayasahay-net
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/v1/health/live" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health/live" ]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 15s
+      start_period: 45s
 
   # ---------------------------------------------------------------------------
   # Frontend — Nginx serving React + reverse proxy to backend

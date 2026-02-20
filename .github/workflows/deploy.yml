@@ -121,7 +121,7 @@ jobs:
 
             # 5. Verify deployment
             echo "🔍 Verifying deployment..."
-            curl -sf http://localhost:8000/api/v1/health/live && echo "✓ Backend healthy" || echo "✗ Backend unhealthy"
+            curl -sf http://localhost:8000/health/live && echo "✓ Backend healthy" || echo "✗ Backend unhealthy"
             curl -sf http://localhost/health-ping && echo "✓ Frontend healthy" || echo "✗ Frontend unhealthy"
 
             # 6. Cleanup old images
