@@ -5,23 +5,25 @@ Main chat endpoints for the RAG-powered legal question answering.
 
 from typing import Optional, List
 from uuid import UUID
-import logging
+import json # Added for stream_generator
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.db.database import get_db
+from app.db.database import get_db, get_independent_session
 from app.db.models import User, MessageRole
 from app.db.crud import ChatSessionCRUD, ChatMessageCRUD, QueryLogCRUD
-from app.api.dependencies import get_current_user_optional, get_rag_pipeline_dep
-from app.core.rag_pipeline import RAGPipeline
+from app.api.dependencies import get_current_user_optional, get_rag_pipeline_dep # Kept get_current_user_optional, get_rag_pipeline_dep
+from app.core.rag_pipeline import RAGPipeline # Removed LegalSource from here, it's in schemas
 from app.schemas.chat import (
     ChatRequest, ChatResponse, 
     ChatSessionSchema, ChatSessionDetailSchema, ChatMessageSchema,
     LegalSource
 )
+from fastapi.responses import StreamingResponse # Moved up
+from app.utils.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -146,6 +148,144 @@ async def chat(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing query: {str(e)}"
         )
+
+
+@router.post("/stream")
+async def chat_stream(
+    request: ChatRequest,
+    user: Optional[User] = Depends(get_current_user_optional),
+    rag: RAGPipeline = Depends(get_rag_pipeline_dep)
+):
+    """
+    Stream chat response (Server-Sent Events).
+    
+    Viva Explanation:
+    - Uses async generator to stream tokens to client
+    - Prevents blocking event loop
+    - Handles independent DB session for saving logs
+    """
+    user_id = user.id if user else None
+    
+    # Get or create chat session (this part needs to be done before streaming starts
+    # to get the session_id for the initial user message and for the stream)
+    session_id_for_stream = None
+    with get_independent_session() as db_session:
+        if request.session_id:
+            session = ChatSessionCRUD.get_by_id(db_session, request.session_id)
+            if not session:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Chat session not found"
+                )
+            session_id_for_stream = session.id
+        else:
+            title = request.query[:50] + "..." if len(request.query) > 50 else request.query
+            session = ChatSessionCRUD.create(db_session, user_id=user_id, title=title)
+            session_id_for_stream = session.id
+        
+        # Store user message immediately in the same session
+        ChatMessageCRUD.create(
+            db=db_session,
+            session_id=session_id_for_stream,
+            role=MessageRole.USER,
+            content=request.query
+        )
+
+    async def stream_generator():
+        full_answer = ""
+        sources = []
+        is_fallback = False
+        latency_ms = 0
+        
+        try:
+            # Yield session ID first as a special event
+            yield f"event: session\ndata: {session_id_for_stream}\n\n"
+            
+            # Stream tokens asynchronously
+            async for chunk in rag.aquery_stream(request.query):
+                if chunk.startswith("\n__METADATA__:"):
+                    # Extract metadata from the final chunk
+                    meta_json = chunk.replace("\n__METADATA__:", "")
+                    try:
+                        metadata = json.loads(meta_json)
+                        # Reconstruct sources objects
+                        sources_data = metadata.get('sources', [])
+                        sources = [LegalSource(**s) for s in sources_data]
+                        is_fallback = metadata.get('is_fallback', False)
+                        latency_ms = metadata.get('latency_ms', 0)
+                        
+                        # Send the metadata event to client
+                        yield f"event: metadata\ndata: {meta_json}\n\n"
+                    except Exception as e:
+                        logger.error(f"Failed to parse metadata: {e}")
+                else:
+                    # Append to full answer and yield
+                    full_answer += chunk
+                    # SSE format: "data: <content>\n\n"
+                    # We need to escape newlines for SSE data payload if strictly following spec,
+                    # but simple data: <chunk> usually suffices for text fragments.
+                    # Better to use JSON or specialized encoding if expecting complex chars.
+                    # Here we assume simple text.
+                    yield f"data: {chunk}\n\n"
+            
+            # Save logs using a fresh session
+            if full_answer:
+                try:
+                    with get_independent_session() as db_session:
+                        # Store assistant message
+                        ChatMessageCRUD.create(
+                            db=db_session,
+                            session_id=session_id_for_stream,
+                            role=MessageRole.ASSISTANT,
+                            content=full_answer,
+                            sources=[s.model_dump() for s in sources] # Convert LegalSource objects back to dicts for storage
+                        )
+                        
+                        QueryLogCRUD.create(
+                            db=db_session,
+                            query=request.query,
+                            user_id=user_id,
+                            retrieved_docs=[s.model_dump() for s in sources], # Convert LegalSource objects back to dicts for storage
+                            response=full_answer,
+                            sources=[s.model_dump() for s in sources], # Convert LegalSource objects back to dicts for storage
+                            latency_ms=latency_ms,
+                            was_successful=not is_fallback
+                        )
+                        logger.info(f"Stream logs saved for user {user_id}, session {session_id_for_stream}")
+                        
+                except Exception as e:
+                    logger.error(f"Error saving stream result: {e}")
+                    # Compensating record: mark the assistant response as failed
+                    try:
+                        with get_independent_session() as fallback_db:
+                            ChatMessageCRUD.create(
+                                db=fallback_db,
+                                session_id=session_id_for_stream,
+                                role=MessageRole.ASSISTANT,
+                                content="[Assistant response failed to save; please retry]"
+                            )
+                            QueryLogCRUD.create(
+                                db=fallback_db,
+                                query=request.query,
+                                user_id=user_id,
+                                retrieved_docs=[],
+                                response="internal error",
+                                sources=[],
+                                latency_ms=latency_ms,
+                                was_successful=False
+                            )
+                            logger.exception("Full exception for failed stream persistence")
+                    except Exception as fallback_err:
+                        logger.error(f"Compensating record also failed: {fallback_err}")
+                    
+        except Exception as e:
+            logger.error(f"Streaming error: {e}")
+            yield f"event: error\ndata: {json.dumps({'error': 'Stream generation failed'})}\n\n"
+
+    return StreamingResponse(
+        stream_generator(),
+        media_type="text/event-stream"
+    )
 
 
 @router.get("/sessions", response_model=List[ChatSessionSchema])

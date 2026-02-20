@@ -6,6 +6,11 @@
  * 2. Validates state matches stored value (CSRF protection)
  * 3. Sends code + code_verifier to backend
  * 4. Stores JWT token and redirects to chat
+ *
+ * Viva Explanation:
+ * - This is the return URL after Google sign-in completes
+ * - Handles both web (PKCE) and mobile (transfer code) flows
+ * - Stores user session and instantly redirects to the main chat UI
  */
 
 import React, { useEffect, useState, useRef } from 'react';
@@ -50,10 +55,10 @@ function AuthCallback({ onLoginSuccess }) {
 
                 let codeVerifier = null;
 
+                // Step 4: Exchange code for tokens via backend (ALWAYS verify on server)
+                // In production, use same origin (empty string). In dev, use localhost
                 if (isMobile) {
-                    // Mobile flow: no sessionStorage available
-                    // Send without code_verifier - backend will handle it
-                    console.log('Mobile OAuth flow detected');
+                    console.log('Mobile OAuth flow detected - validating via backend');
                 } else {
                     // Web flow: validate state from sessionStorage
                     const storedState = sessionStorage.getItem('oauth_state');
@@ -109,16 +114,39 @@ function AuthCallback({ onLoginSuccess }) {
                                 while (b64.length % 4 !== 0) b64 += '=';
                                 // Decode base64url → standard base64 → string
                                 const decoded = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
-                                mobileRedirectBase = decoded;
+
+                                // Anti-Open Redirect: Validate scheme
+                                const allowedSchemes = ['exp://', 'nyayasahay://'];
+                                const isValidScheme = allowedSchemes.some(scheme => decoded.startsWith(scheme));
+
+                                if (isValidScheme) {
+                                    mobileRedirectBase = decoded;
+                                } else {
+                                    console.warn('Blocked potentially unsafe redirect:', decoded);
+                                    // Fallback to default
+                                    mobileRedirectBase = 'nyayasahay://auth/callback';
+                                }
                             }
                         } catch (e) {
                             console.error('Failed to parse mobile redirect from state:', e);
                         }
                     }
 
-                    // Build deep link URL with auth data
-                    const deepLinkUrl = `${mobileRedirectBase}?token=${encodeURIComponent(data.access_token)}&email=${encodeURIComponent(data.user.email)}&name=${encodeURIComponent(data.user.full_name || data.user.name)}&id=${encodeURIComponent(data.user.id)}`;
-                    console.log('Mobile redirect URL:', deepLinkUrl);
+                    // Build deep link URL with auth data (Use transfer_code if available)
+                    let deepLinkUrl;
+                    if (data.transfer_code) {
+                        // Secure flow: construct URL safely with URL API
+                        const url = new URL(mobileRedirectBase);
+                        url.searchParams.set('code', data.transfer_code);
+                        deepLinkUrl = url.toString();
+                    } else {
+                        // No transfer code — do NOT embed token in URL
+                        console.warn('No transfer_code received; cannot securely redirect to mobile app');
+                        setStatus('error');
+                        setError('Mobile auth failed: missing transfer code. Please try again.');
+                        return;
+                    }
+                    console.log('Mobile redirect URL generated');
 
                     setStatus('success');
 
@@ -147,10 +175,8 @@ function AuthCallback({ onLoginSuccess }) {
 
                 setStatus('success');
 
-                // Redirect to chat
-                setTimeout(() => {
-                    navigate('/chat');
-                }, 1000);
+                // Redirect to chat immediately — no delay needed
+                navigate('/chat');
 
             } catch (err) {
                 console.error('OAuth callback error:', err);

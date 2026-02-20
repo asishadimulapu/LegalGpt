@@ -364,6 +364,41 @@ export async function analyzeDocument(documentContent, question, sessionId = nul
     }
 }
 
+/**
+ * Exchange a temporary transfer code for an access token.
+ * Used after Google OAuth deep link returns a short-lived code.
+ * @param {string} code - The transfer code from the deep link
+ * @returns {Promise<Object>} The access token and user data
+ */
+async function exchangeTransferCode(code) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/auth/mobile/exchange`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code }),
+            signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || `Exchange failed: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+            throw new Error('Transfer code exchange timed out. Please try again.');
+        }
+        throw error;
+    }
+}
+
 export default {
     sendChatMessage,
     getChatSessions,
@@ -377,4 +412,5 @@ export default {
     clearUser,
     uploadFile,
     analyzeDocument,
+    exchangeTransferCode,
 };

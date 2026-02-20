@@ -1,0 +1,101 @@
+# =============================================================================
+# NyayaSahay - Docker Compose
+# Backend (FastAPI) + Frontend (Nginx) + Redis
+# =============================================================================
+# Usage:
+#   docker compose up -d            # Start all services
+#   docker compose up -d --build    # Rebuild and start
+#   docker compose logs -f backend  # Follow backend logs
+#   docker compose down             # Stop all services
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Backend — FastAPI + RAG Pipeline
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nyayasahay-backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - APP_ENV=production
+      - REDIS_URL=redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount FAISS index data (persist across container restarts)
+      - ./data/faiss_index:/app/data/faiss_index:ro
+      # Mount logs directory for persistence
+      - backend-logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - nyayasahay-net
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/v1/health/live" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # Frontend — Nginx serving React + reverse proxy to backend
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nyayasahay-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - nyayasahay-net
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost/health-ping" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # Redis — session cache and rate limiting
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: nyayasahay-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - nyayasahay-net
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  redis-data:
+    driver: local
+  backend-logs:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  nyayasahay-net:
+    driver: bridge

@@ -1,7 +1,7 @@
 # =============================================================================
-# CI Pipeline - LegalGpt
-# Runs on every push and pull request
-# Tests backend (Python) and builds frontend (Node.js)
+# CI Pipeline - NyayaSahay (LegalGpt)
+# Runs on every push and pull request (tests + build + security)
+# CD is handled separately by deploy.yml
 # =============================================================================
 
 name: CI - Test & Build

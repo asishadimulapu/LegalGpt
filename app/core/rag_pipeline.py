@@ -85,8 +85,8 @@ def get_llm():
             timeout=30.0,
             max_retries=2,
             default_headers={
-                "HTTP-Referer": "http://localhost:8000",
-                "X-Title": "Indian Law RAG Chatbot"
+                "HTTP-Referer": settings.app_url,
+                "X-Title": settings.app_name
             }
         )
     
@@ -350,6 +350,190 @@ class RAGPipeline:
         except Exception as e:
             logger.error(f"RAG pipeline error: {e}")
             latency_ms = int((time.time() - start_time) * 1000)
+            raise
+
+    def generate_response_stream(
+        self, 
+        query: str, 
+        context: str
+    ):
+        """
+        Stream response using LLM with retrieved context (Synchronous).
+        """
+        # Create prompt template
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", RAG_SYSTEM_PROMPT),
+            ("human", RAG_QA_TEMPLATE)
+        ])
+        
+        # Create chain
+        chain = prompt | self.llm | StrOutputParser()
+        
+        # Stream response
+        for chunk in chain.stream({
+            "context": context,
+            "question": query
+        }):
+            yield chunk
+
+    async def agenerate_response_stream(
+        self, 
+        query: str, 
+        context: str
+    ):
+        """
+        Stream response using LLM with retrieved context (Asynchronous).
+        """
+        # Create prompt template
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", RAG_SYSTEM_PROMPT),
+            ("human", RAG_QA_TEMPLATE)
+        ])
+        
+        # Create chain
+        chain = prompt | self.llm | StrOutputParser()
+        
+        # Async stream response
+        async for chunk in chain.astream({
+            "context": context,
+            "question": query
+        }):
+            yield chunk
+
+    def query_stream(
+        self, 
+        query: str, 
+        top_k: int = None
+    ):
+        """
+        Execute full RAG pipeline with streaming response (Synchronous).
+        """
+        start_time = time.time()
+        
+        try:
+            # Step 1: Retrieve relevant documents
+            retrieval_start = time.time()
+            documents = self.retrieve(query, top_k)
+            retrieval_ms = int((time.time() - retrieval_start) * 1000)
+            
+            # Step 2: Check if any relevant documents found
+            if not documents:
+                logger.warning(f"No documents found for query: {query[:100]}")
+                latency_ms = int((time.time() - start_time) * 1000)
+                yield FALLBACK_RESPONSE
+                # Yield metadata as a special final chunk
+                import json
+                yield f"\n__METADATA__:{json.dumps({'sources': [], 'is_fallback': True, 'latency_ms': latency_ms})}"
+                return
+            
+            # Step 3: Format context
+            context = format_retrieved_context(documents)
+            
+            # Step 4: Stream response (LLM)
+            llm_start = time.time()
+            full_answer = ""
+            
+            # Yield chunks as they arrive
+            for chunk in self.generate_response_stream(query, context):
+                full_answer += chunk
+                yield chunk
+                
+            llm_ms = int((time.time() - llm_start) * 1000)
+            
+            # Step 5: Format sources
+            sources = self.format_sources(documents)
+            
+            # Calculate total latency
+            latency_ms = int((time.time() - start_time) * 1000)
+            
+            # Check if response is a fallback
+            is_fallback = FALLBACK_RESPONSE.lower() in full_answer.lower()
+            
+            # Detailed timing breakdown
+            logger.info(f"Stream query completed in {latency_ms}ms")
+            
+            # Yield metadata as a special final chunk
+            import json
+            sources_dict = [s.model_dump() for s in sources]
+            metadata = {
+                'sources': sources_dict,
+                'is_fallback': is_fallback,
+                'latency_ms': latency_ms,
+                'full_answer': full_answer 
+            }
+            yield f"\n__METADATA__:{json.dumps(metadata)}"
+        
+        except Exception as e:
+            logger.error(f"RAG streaming pipeline error: {e}")
+            raise
+
+    async def aquery_stream(
+        self, 
+        query: str, 
+        top_k: int = None
+    ):
+        """
+        Execute full RAG pipeline with streaming response (Asynchronous).
+        Uses run_in_threadpool for blocking retrieval to avoid blocking event loop.
+        """
+        from starlette.concurrency import run_in_threadpool
+        start_time = time.time()
+        
+        try:
+            # Step 1: Retrieve relevant documents (Blocking - run in thread)
+            retrieval_start = time.time()
+            documents = await run_in_threadpool(self.retrieve, query, top_k)
+            retrieval_ms = int((time.time() - retrieval_start) * 1000)
+            
+            # Step 2: Check if any relevant documents found
+            if not documents:
+                logger.warning(f"No documents found for query: {query[:100]}")
+                latency_ms = int((time.time() - start_time) * 1000)
+                yield FALLBACK_RESPONSE
+                # Yield metadata as a special final chunk
+                import json
+                yield f"\n__METADATA__:{json.dumps({'sources': [], 'is_fallback': True, 'latency_ms': latency_ms})}"
+                return
+            
+            # Step 3: Format context
+            context = format_retrieved_context(documents)
+            
+            # Step 4: Stream response (LLM - Async)
+            llm_start = time.time()
+            full_answer = ""
+            
+            # Yield chunks as they arrive
+            async for chunk in self.agenerate_response_stream(query, context):
+                full_answer += chunk
+                yield chunk
+                
+            llm_ms = int((time.time() - llm_start) * 1000)
+            
+            # Step 5: Format sources
+            sources = self.format_sources(documents)
+            
+            # Calculate total latency
+            latency_ms = int((time.time() - start_time) * 1000)
+            
+            # Check if response is a fallback
+            is_fallback = FALLBACK_RESPONSE.lower() in full_answer.lower()
+            
+            # Detailed timing breakdown
+            logger.info(f"Stream query completed in {latency_ms}ms")
+            
+            # Yield metadata as a special final chunk
+            import json
+            sources_dict = [s.model_dump() for s in sources]
+            metadata = {
+                'sources': sources_dict,
+                'is_fallback': is_fallback,
+                'latency_ms': latency_ms,
+                'full_answer': full_answer 
+            }
+            yield f"\n__METADATA__:{json.dumps(metadata)}"
+        
+        except Exception as e:
+            logger.error(f"RAG streaming pipeline error: {e}")
             raise
     
     def is_ready(self) -> bool:

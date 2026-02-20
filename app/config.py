@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     app_env: Literal["development", "staging", "production"] = "production"  # Default to production for safety
     app_name: str = "Indian Law RAG Chatbot"
     app_version: str = "1.0.0"
+    app_url: str = "http://localhost:8000"  # Base URL for the application
     debug: bool = False  # Default to False for production
     log_level: str = "INFO"
     
@@ -148,8 +149,26 @@ def get_settings() -> Settings:
     - @lru_cache creates a singleton pattern
     - Environment variables are loaded once at startup
     - Subsequent calls return the cached instance
+    - Validates critical secrets in non-development environments
     """
-    return Settings()
+    instance = Settings()
+    
+    # Fail-fast: critical secrets must be set outside development
+    if not instance.is_development:
+        missing = []
+        if not instance.jwt_secret_key:
+            missing.append("jwt_secret_key")
+        if not instance.encryption_key:
+            missing.append("encryption_key")
+        if not instance.api_signing_key:
+            missing.append("api_signing_key")
+        if missing:
+            raise RuntimeError(
+                f"FATAL: Missing required secrets for {instance.app_env} environment: "
+                f"{', '.join(missing)}. Set these in your .env file."
+            )
+    
+    return instance
 
 
 # Create a global settings instance for easy imports

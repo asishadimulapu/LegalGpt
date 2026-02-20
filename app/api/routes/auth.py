@@ -20,16 +20,67 @@ from app.db.crud import UserCRUD
 from app.schemas.user import UserCreate, UserLogin, UserResponse, Token
 from app.utils.auth import create_access_token, validate_password_strength
 from app.utils.audit import AuditLogger
+from app.utils.logging_config import get_logger
 
-import logging
+
 import json
 import os
 import base64
-from datetime import datetime, timezone
+import asyncio
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from urllib.parse import urlencode
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+# Temporary cache for mobile auth code exchange (Simple in-memory for now)
+# In production, use Redis or DB with TTL
+# Map: transfer_code -> {access_token: str, expires_at: datetime}
+_TEMP_AUTH_CODES_MAX_SIZE = 100  # Prevent unbounded growth
+temp_auth_codes = {}
+_temp_auth_codes_lock = asyncio.Lock()
+
+
+async def _cleanup_expired_temp_auth_codes():
+    """
+    Remove expired entries from temp_auth_codes (lazy cleanup).
+
+    Viva Explanation:
+    - Acquires asyncio lock to prevent concurrent dict mutation
+    - Snapshots items via list() for safe iteration during cleanup
+    - Called lazily on access and before inserts to bound memory usage
+    """
+    async with _temp_auth_codes_lock:
+        now = datetime.now(timezone.utc)
+        expired_keys = [k for k, v in list(temp_auth_codes.items()) if now > v.get("expires_at", now)]
+        for k in expired_keys:
+            temp_auth_codes.pop(k, None)
+
+
+async def _store_temp_auth_code(code: str, data: dict):
+    """
+    Store a transfer code with max-size enforcement and lazy cleanup.
+
+    Viva Explanation:
+    - Acquires asyncio lock to serialize concurrent dict mutations
+    - Enforces a cap on the dict to prevent unbounded memory growth
+    - Evicts expired entries first, then entry closest to expiry if still at capacity
+    - Ensures the auth code cache stays bounded in single-instance setups
+    """
+    async with _temp_auth_codes_lock:
+        if len(temp_auth_codes) >= _TEMP_AUTH_CODES_MAX_SIZE:
+            # Remove expired first
+            now = datetime.now(timezone.utc)
+            expired_keys = [k for k, v in list(temp_auth_codes.items()) if now > v.get("expires_at", now)]
+            for k in expired_keys:
+                temp_auth_codes.pop(k, None)
+        # If still at capacity, evict the entry closest to expiry
+        if len(temp_auth_codes) >= _TEMP_AUTH_CODES_MAX_SIZE:
+            evict_key = min(temp_auth_codes, key=lambda k: temp_auth_codes[k].get("expires_at", now))
+            temp_auth_codes.pop(evict_key, None)
+        temp_auth_codes[code] = data
+
 
 # Fallback audit log directory
 _FALLBACK_AUDIT_DIR = Path("logs/fallback_audit")
@@ -401,6 +452,7 @@ class GoogleAuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+    transfer_code: Optional[str] = None  # Temporary code for mobile to exchange for token
 
 
 @router.get("/google/url", response_model=GoogleAuthURL)
@@ -426,6 +478,23 @@ async def get_google_oauth_url(source: Optional[str] = None, mobile_redirect: Op
     
     if source == "mobile":
         if mobile_redirect:
+            # Validate redirect URI scheme to prevent Open Redirect attacks
+            # Only allow specific schemes: 'exp' (Expo Go) and 'nyayasahay' (Production App)
+            allowed_schemes = {"exp", "nyayasahay"}
+            try:
+                scheme = mobile_redirect.split(":")[0]
+                if scheme not in allowed_schemes:
+                    logger.warning(f"Blocked invalid mobile redirect scheme: {scheme}")
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid redirect URI scheme. Allowed: exp, nyayasahay"
+                    )
+            except IndexError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid redirect URI format"
+                )
+
             # Encode redirect URI in state: mobile.<base64url(redirect)>.<random>
             # Uses '.' separator which is safe (not in base64url or token_urlsafe alphabet)
             redirect_b64 = base64.urlsafe_b64encode(mobile_redirect.encode()).decode().rstrip('=')
@@ -446,7 +515,7 @@ async def get_google_oauth_url(source: Optional[str] = None, mobile_redirect: Op
         "prompt": "consent"
     }
     
-    query_string = "&".join(f"{k}={v}" for k, v in params.items())
+    query_string = urlencode(params)
     auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{query_string}"
     
     return GoogleAuthURL(auth_url=auth_url, state=state)
@@ -484,7 +553,7 @@ async def google_oauth_callback(
     
     try:
         # Step 1: Exchange authorization code for tokens
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             token_data = {
                     "client_id": settings.google_client_id,
                     "client_secret": settings.google_client_secret,
@@ -511,7 +580,7 @@ async def google_oauth_callback(
         tokens = token_response.json()
         
         # Step 2: Get user info from Google
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             userinfo_response = await client.get(
                 "https://www.googleapis.com/oauth2/v2/userinfo",
                 headers={"Authorization": f"Bearer {tokens['access_token']}"}
@@ -602,6 +671,24 @@ async def google_oauth_callback(
         
         access_token = create_access_token(subject=user.id)
         
+        # Check if mobile flow (via state prefix)
+        transfer_code = None
+        if callback_data.state.startswith("mobile."):
+            # Generate short-lived transfer code
+            # We don't want to expose the JWT in the URL
+            transfer_code = secrets.token_urlsafe(16)
+            _store_temp_auth_code(transfer_code, {
+                "access_token": access_token,
+                "user": UserResponse(
+                    id=user.id,
+                    email=user.email,
+                    full_name=user.full_name,
+                    is_active=user.is_active,
+                    created_at=user.created_at
+                ),
+                "expires_at": datetime.now(timezone.utc) + timedelta(minutes=1)
+            })
+        
         return GoogleAuthResponse(
             access_token=access_token,
             user=UserResponse(
@@ -610,7 +697,8 @@ async def google_oauth_callback(
                 full_name=user.full_name,
                 is_active=user.is_active,
                 created_at=user.created_at
-            )
+            ),
+            transfer_code=transfer_code
         )
         
     except HTTPException:
@@ -650,7 +738,7 @@ async def google_mobile_auth(
     
     try:
         # Verify the access token by fetching user info from Google
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             userinfo_response = await client.get(
                 "https://www.googleapis.com/oauth2/v2/userinfo",
                 headers={"Authorization": f"Bearer {auth_data.access_token}"}
@@ -684,6 +772,18 @@ async def google_mobile_auth(
             if user:
                 user = UserCRUD.link_google_account(db, user, google_id, picture)
                 logger.info(f"Mobile: Linked Google account to existing user: {email}")
+                
+                AuditLogger.log_event(
+                    db=db,
+                    event_type="google_account_linked",
+                    event_category="authentication",
+                    severity="info",
+                    user_id=user.id,
+                    ip_address=client_ip,
+                    details={"email": email, "source": "mobile"},
+                    success=True,
+                    force_commit=True
+                )
             else:
                 user = UserCRUD.create_google_user(
                     db=db,
@@ -693,6 +793,18 @@ async def google_mobile_auth(
                     picture_url=picture
                 )
                 logger.info(f"Mobile: Created new Google OAuth user: {email}")
+                
+                AuditLogger.log_event(
+                    db=db,
+                    event_type="google_registration_success",
+                    event_category="authentication",
+                    severity="info",
+                    user_id=user.id,
+                    ip_address=client_ip,
+                    details={"email": email, "source": "mobile"},
+                    success=True,
+                    force_commit=True
+                )
         
         if not user.is_active:
             raise HTTPException(
@@ -729,3 +841,45 @@ async def google_mobile_auth(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Authentication failed. Please try again."
         )
+
+
+class ExchangeRequest(BaseModel):
+    code: str
+
+
+@router.post("/mobile/exchange", response_model=GoogleAuthResponse)
+async def exchange_transfer_code(request: ExchangeRequest):
+    """
+    Exchange a temporary transfer code for an access token.
+    Used by mobile app to securely retrieve the token after deep link.
+
+    Viva Explanation:
+    - Mobile app receives a short-lived transfer_code via deep link
+    - This endpoint exchanges it for the actual JWT (one-time use)
+    - Expired entries are cleaned up lazily on access
+    """
+    # Lazy cleanup on every access
+    await _cleanup_expired_temp_auth_codes()
+
+    async with _temp_auth_codes_lock:
+        code_data = temp_auth_codes.get(request.code)
+
+        if not code_data:
+            raise HTTPException(status_code=400, detail="Invalid code")
+
+        if datetime.now(timezone.utc) > code_data["expires_at"]:
+            temp_auth_codes.pop(request.code, None)
+            raise HTTPException(status_code=400, detail="Code expired")
+
+        # One-time use: pop the code so it cannot be reused
+        temp_auth_codes.pop(request.code, None)
+    token = code_data["access_token"]
+    user = code_data["user"]
+
+    # Audit log for transfer code exchange
+    logger.info(f"Transfer code exchanged successfully for user {user.email}")
+
+    return GoogleAuthResponse(
+        access_token=token,
+        user=user
+    )

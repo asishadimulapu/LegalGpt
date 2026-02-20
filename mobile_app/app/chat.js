@@ -166,36 +166,69 @@ export default function ChatScreen() {
         scrollToBottom();
 
         try {
-            let response;
-
-            if (fileContent) {
-                // Use document analysis for file-based queries
-                response = await analyzeDocument(fileContent, query, sessionId, uploadedFile?.name);
-            } else {
-                response = await sendChatMessage(query, sessionId);
-            }
-
-            if (response.session_id) {
-                setSessionId(response.session_id);
-            }
-
+            // Create placeholder bot message
+            const botMessageId = Date.now() + 1;
             const botMessage = {
-                id: Date.now() + 1,
+                id: botMessageId,
                 role: 'bot',
-                content: response.answer,
-                sources: response.sources || [],
-                isFallback: response.is_fallback || false,
-                latency: response.latency_ms,
+                content: '',
+                sources: [],
+                isFallback: false,
+                latency: 0,
                 timestamp: getTimestamp(),
                 basedOnFile: !!fileContent,
             };
             setMessages(prev => [...prev, botMessage]);
 
-            // Clear file after successful upload-based query
             if (fileContent) {
-                setUploadedFile(null);
-                setFileContent(null);
+                // Use document analysis for file-based queries (no streaming yet)
+                const response = await analyzeDocument(fileContent, query, sessionId, uploadedFile?.name);
+
+                if (response.session_id) {
+                    setSessionId(response.session_id);
+                }
+
+                setMessages(prev => prev.map(msg =>
+                    msg.id === botMessageId
+                        ? {
+                            ...msg,
+                            content: response.answer,
+                            sources: response.sources || [],
+                            isFallback: response.is_fallback,
+                            latency: response.latency_ms
+                        }
+                        : msg
+                ));
+
+                if (fileContent) {
+                    setUploadedFile(null);
+                    setFileContent(null);
+                }
+                setIsLoading(false);
+                scrollToBottom();
+                return;
             }
+
+            // Use the non-streaming chat API (sendChatMessage uses /api/v1/chat)
+            // TODO: Re-enable streaming via /chat/stream once production is re-deployed
+            const response = await sendChatMessage(query, sessionId);
+
+            if (response.session_id) {
+                setSessionId(response.session_id);
+            }
+
+            setMessages(prev => prev.map(msg =>
+                msg.id === botMessageId
+                    ? {
+                        ...msg,
+                        content: response.answer,
+                        sources: response.sources || [],
+                        isFallback: response.is_fallback,
+                        latency: response.latency_ms,
+                    }
+                    : msg
+            ));
+
         } catch (err) {
             const errorMessage = {
                 id: Date.now() + 1,

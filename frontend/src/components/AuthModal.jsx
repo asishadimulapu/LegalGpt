@@ -99,16 +99,19 @@ function AuthModal({ isOpen, mode, onClose, onSubmit, onSwitchMode }) {
                     <div className="auth-logo">
                         <Scale size={28} />
                     </div>
-                    <h2>{isSignIn ? 'Welcome Back' : 'Create Account'}</h2>
+                    <h2>Welcome to NyayaSahay</h2>
                     <p>
                         {isSignIn
                             ? 'Sign in to access your legal consultation history'
-                            : 'Join NyayaSahay for personalized legal guidance'
+                            : 'Create an account for personalized legal guidance'
                         }
                     </p>
                 </div>
 
-                {/* Google OAuth */}
+                {/* Google OAuth — Recommended */}
+                <div className="auth-recommended">
+                    <span className="recommended-badge">✦ Recommended — Instant access</span>
+                </div>
                 <GoogleAuth
                     isLoading={isLoading}
                     onError={(msg) => setError(msg)}
@@ -174,6 +177,7 @@ function AuthModal({ isOpen, mode, onClose, onSubmit, onSwitchMode }) {
                                 type="button"
                                 className="password-toggle"
                                 onClick={() => setShowPassword(!showPassword)}
+                                aria-label={showPassword ? "Hide password" : "Show password"}
                             >
                                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                             </button>

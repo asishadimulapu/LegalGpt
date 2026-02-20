@@ -236,54 +236,145 @@ function Chat({ user, onLogout }) {
         setIsLoading(true);
 
         try {
-            let response;
-
-            if (fileContent) {
-                // Pass filename for chat history context
-                response = await sendChatWithFile(query, fileContent, sessionId, uploadedFile?.name);
-            } else {
-                response = await sendChatMessage(query, sessionId);
-            }
-
-            if (response.session_id) {
-                setSessionId(response.session_id);
-                setActiveSessionId(response.session_id);
-                // Reload sessions to show new one
-                if (user) {
-                    loadSessions();
-                }
-            }
-
+            // Create placeholder bot message
+            const botMessageId = Date.now() + 1;
             const botMessage = {
-                id: Date.now() + 1,
+                id: botMessageId,
                 role: 'bot',
-                content: response.answer,
-                sources: response.sources || [],
-                isFallback: response.is_fallback || false,
-                latency: response.latency_ms,
+                content: '',
+                sources: [],
+                isFallback: false,
+                latency: 0,
                 timestamp: getTimestamp(),
                 basedOnFile: !!fileContent,
             };
             setMessages(prev => [...prev, botMessage]);
 
             if (fileContent) {
+                // File upload chat doesn't support streaming yet
+                // Pass filename for chat history context
+                const response = await sendChatWithFile(query, fileContent, sessionId, uploadedFile?.name);
+
+                if (response.session_id) {
+                    setSessionId(response.session_id);
+                    setActiveSessionId(response.session_id);
+                    if (user) loadSessions();
+                }
+
+                setMessages(prev => prev.map(msg =>
+                    msg.id === botMessageId
+                        ? {
+                            ...msg,
+                            content: response.answer,
+                            sources: response.sources || [],
+                            isFallback: response.is_fallback,
+                            latency: response.latency_ms
+                        }
+                        : msg
+                ));
+
                 setUploadedFile(null);
                 setFileContent(null);
+                setIsLoading(false);
+                return;
+            }
+
+            // Streaming chat
+            const token = localStorage.getItem('token');
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'}/chat/stream`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    query,
+                    session_id: sessionId
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.statusText}`);
+            }
+
+            if (!response.body) {
+                throw new Error('ReadableStream not supported in this browser.');
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let accumulatedContent = '';
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('event: session')) {
+                        const data = line.split('data: ')[1];
+                        if (data && (!sessionId || sessionId !== data)) {
+                            setSessionId(data);
+                            setActiveSessionId(data);
+                            if (user) loadSessions(); // Refresh list to show new session
+                        }
+                    } else if (line.startsWith('event: sources')) {
+                        const data = line.split('data: ')[1];
+                        if (data) {
+                            try {
+                                const sources = JSON.parse(data);
+                                setMessages(prev => prev.map(msg =>
+                                    msg.id === botMessageId ? { ...msg, sources } : msg
+                                ));
+                            } catch (e) {
+                                console.error('Error parsing sources:', e);
+                            }
+                        }
+                    } else if (line.startsWith('event: error')) {
+                        const data = line.split('data: ')[1];
+                        throw new Error(JSON.parse(data));
+                    } else if (line.startsWith('data: ')) {
+                        try {
+                            const data = line.substring(6); // Remove "data: "
+                            const text = JSON.parse(data);
+                            accumulatedContent += text;
+
+                            setMessages(prev => prev.map(msg =>
+                                msg.id === botMessageId ? { ...msg, content: accumulatedContent } : msg
+                            ));
+                        } catch (e) {
+                            // Ignore incomplete JSON chunks or keep-alives
+                        }
+                    }
+                }
             }
 
         } catch (err) {
             const errorMsg = typeof err === 'string'
                 ? err
                 : (err?.message || err?.detail || JSON.stringify(err) || 'An unexpected error occurred');
-            const errorMessage = {
-                id: Date.now() + 1,
-                role: 'bot',
-                content: `I apologize, but I encountered an error: ${errorMsg}. Please try again.`,
-                isFallback: true,
-                timestamp: getTimestamp(),
-            };
-            setMessages(prev => [...prev, errorMessage]);
-            setError(errorMsg);
+
+            setMessages(prev => prev.map(msg => {
+                if (msg.role === 'bot' && msg.content === '') {
+                    return {
+                        ...msg,
+                        content: `I apologize, but I encountered an error: ${errorMsg}. Please try again.`,
+                        isFallback: true
+                    };
+                }
+                return msg;
+            }));
+
+            // If strictly new error message needed:
+            if (!messages.some(m => m.content && m.content.includes(errorMsg))) {
+                setError(errorMsg);
+            }
         } finally {
             setIsLoading(false);
             inputRef.current?.focus();
@@ -417,7 +508,7 @@ function Chat({ user, onLogout }) {
                             <Home size={16} /> Home
                         </Link>
                     </div>
-                    
+
                     {/* Unified Account Section */}
                     {user ? (
                         <div className="account-card">

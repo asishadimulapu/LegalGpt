@@ -31,7 +31,8 @@
       "expo-router",
       "expo-font",
       "expo-secure-store",
-      "expo-asset"
+      "expo-asset",
+      "expo-sqlite"
     ],
     "scheme": "nyayasahay",
     "experiments": {

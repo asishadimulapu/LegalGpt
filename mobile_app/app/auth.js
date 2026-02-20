@@ -93,17 +93,39 @@ export default function AuthScreen() {
             if (result.type === 'success' && result.url) {
                 console.log('✅ Auth returned:', result.url);
                 const url = new URL(result.url);
-                const token = url.searchParams.get('token');
-                const email = url.searchParams.get('email');
-                const name = url.searchParams.get('name');
-                const id = url.searchParams.get('id');
+                const code = url.searchParams.get('code');
+                const token = url.searchParams.get('token'); // Fallback
 
-                if (token) {
+                if (code) {
+                    // Secure flow: Exchange code for token
+                    console.log('🔄 Exchanging transfer code...');
+                    const { exchangeTransferCode } = require('../services/api'); // Dynamic import to avoid cycles if any
+                    const authData = await exchangeTransferCode(code);
+
+                    await saveUser({
+                        token: authData.access_token,
+                        email: authData.user.email,
+                        name: authData.user.full_name,
+                        id: authData.user.id
+                    });
+
+                    // Small delay to ensure SecureStore write completes
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    router.replace('/chat');
+
+                } else if (token) {
+                    // Legacy/Fallback flow
+                    const email = url.searchParams.get('email');
+                    const name = url.searchParams.get('name');
+                    const id = url.searchParams.get('id');
+
                     // Step 4: Save user and navigate to chat
                     await saveUser({ token, email, name, id });
+                    // Small delay to ensure SecureStore write completes
+                    await new Promise(resolve => setTimeout(resolve, 100));
                     router.replace('/chat');
                 } else {
-                    throw new Error('No token received from authentication');
+                    throw new Error('No auth code or token received');
                 }
             } else if (result.type === 'cancel' || result.type === 'dismiss') {
                 // User cancelled - do nothing

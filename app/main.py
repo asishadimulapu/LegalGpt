@@ -19,11 +19,12 @@ import time
 from app.config import settings
 from app.db.database import init_db
 from app.core.vector_store import vector_store_manager
-from app.api.routes import health, chat, retrieval, auth, upload
+from app.api.routes import health, chat, retrieval, auth, upload, guides
 from app.utils.logging_config import setup_logging
 
 # Initialize logging
 logger = setup_logging()
+
 
 
 # =============================================================================
@@ -59,9 +60,13 @@ async def lifespan(app: FastAPI):
     try:
         init_db()
         logger.info("✓ Database initialized")
+        app.state.db_degraded = False
     except Exception as e:
         logger.error(f"✗ Database initialization failed: {e}")
-        # Continue anyway - database might just need connection
+        app.state.db_degraded = True
+        # In production, re-raise to crash fast
+        if settings.is_production:
+            raise
     
     # Pre-warm embedding model for faster first queries
     try:
@@ -241,6 +246,7 @@ app.include_router(chat.router, prefix="/api/v1")
 app.include_router(retrieval.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(upload.router, prefix="/api/v1")
+app.include_router(guides.router, prefix="/api/v1")
 
 
 # =============================================================================
@@ -260,6 +266,8 @@ async def root():
         "endpoints": {
             "chat": "/api/v1/chat",
             "retrieve": "/api/v1/retrieve",
-            "auth": "/api/v1/auth"
+            "auth": "/api/v1/auth",
+            "guides": "/api/v1/guides",
+            "upload": "/api/v1/upload"
         }
     }

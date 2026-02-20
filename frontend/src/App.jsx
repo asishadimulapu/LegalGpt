@@ -26,7 +26,13 @@ import AuthCallback from './pages/AuthCallback';
 import { registerUser, loginUser, validateToken } from './services/api';
 
 /**
- * App Layout Component - provides navigation context
+ * App Layout Component — provides navigation context
+ *
+ * Viva Explanation:
+ * - Central orchestrator for the entire web application UI
+ * - Manages auth state with optimistic localStorage restore
+ * - Routes users between Landing, Chat, and static pages
+ * - Provides AuthModal for sign-in/register flows
  */
 function AppLayout() {
   const navigate = useNavigate();
@@ -34,32 +40,46 @@ function AppLayout() {
   const [authModal, setAuthModal] = useState({ isOpen: false, mode: 'signin' });
   const [user, setUser] = useState(null);
 
-  // Validate token on app load - prevent showing logged in with expired token
+  // Optimistic session restore: set user immediately, validate token in background.
+  // This eliminates the race condition where Chat.jsx renders before
+  // token validation completes, making the user appear logged-out.
   useEffect(() => {
-    const validateSession = async () => {
-      const saved = localStorage.getItem('nyayasahay_user');
-      if (saved) {
+    const saved = localStorage.getItem('nyayasahay_user');
+    if (saved) {
+      try {
         const userData = JSON.parse(saved);
-        try {
-          // Validate token with backend
-          const isValid = await validateToken(userData.token);
-          if (isValid) {
-            setUser(userData);
-          } else {
-            // Token expired - clear storage
+        // Optimistic: show user instantly (prevents flash of logged-out state)
+        setUser(userData);
+
+        // Background: validate token — if invalid, clear state silently
+        const originalToken = userData.token;
+        validateToken(userData.token).then(isValid => {
+          if (!isValid) {
+            // Re-read localStorage to avoid clearing a newer session
+            const current = localStorage.getItem('nyayasahay_user');
+            if (current) {
+              try {
+                const currentData = JSON.parse(current);
+                if (currentData.token !== originalToken) return; // stale validation
+              } catch { /* corrupted — clear below */ }
+            }
             console.log('Session expired, logging out');
             localStorage.removeItem('nyayasahay_user');
             setUser(null);
           }
-        } catch (error) {
-          // Token invalid or server error - clear storage
-          console.log('Token validation failed:', error.message);
-          localStorage.removeItem('nyayasahay_user');
-          setUser(null);
-        }
+        }).catch((err) => {
+          // Only suppress expected network/offline errors
+          if (!navigator.onLine || err?.name === 'TypeError' || err?.message?.includes('fetch')) {
+            console.log('Token validation skipped (offline/network error)');
+          } else {
+            console.error('Unexpected error during token validation:', err);
+          }
+        });
+      } catch {
+        // Corrupted localStorage entry
+        localStorage.removeItem('nyayasahay_user');
       }
-    };
-    validateSession();
+    }
   }, []);
 
   // Handle auth modal

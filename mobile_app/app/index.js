@@ -3,7 +3,8 @@
  * Professional swipeable pages layout with responsive design
  */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { InteractionManager } from 'react-native';
 import {
     View,
     Text,
@@ -13,7 +14,9 @@ import {
     FlatList,
     Animated,
     useWindowDimensions,
+    ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -25,6 +28,9 @@ import {
 
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
 import { wp, hp, ms, screenSize } from '../constants/responsive';
+import { getUser } from '../services/api';
+
+const ONBOARDING_SEEN_KEY = 'nyayasahay_onboarding_seen';
 
 // Page data
 
@@ -89,12 +95,57 @@ const PAGES = [
     },
 ];
 
+/**
+ * LandingScreen - Onboarding slider for first-time users.
+ *
+ * Viva Explanation:
+ * - Checks SecureStore for existing auth on mount — redirects logged-in users to /chat
+ * - Persists hasSeenOnboarding in AsyncStorage so returning users skip to CTA
+ * - Shows branded splash while resolving auth to avoid onboarding flash
+ * - Swipeable pages introduce features, steps, and a call-to-action
+ */
 export default function LandingScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const flatListRef = useRef(null);
     const [currentPage, setCurrentPage] = useState(0);
+    const [isCheckingAuth, setIsCheckingAuth] = useState(true);
     const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+
+    // Check login state on mount — skip onboarding for logged-in users
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                const user = await getUser();
+                if (user && mounted) {
+                    // Already logged in — go straight to chat
+                    router.replace('/chat');
+                    return;
+                }
+                // Not logged in — check if they've seen onboarding before
+                const seen = await AsyncStorage.getItem(ONBOARDING_SEEN_KEY);
+                if (seen === 'true' && mounted) {
+                    // Returning user — jump to CTA page (last slide)
+                    InteractionManager.runAfterInteractions(() => {
+                        try {
+                            if (flatListRef.current && PAGES.length > 0) {
+                                flatListRef.current.scrollToIndex({ index: PAGES.length - 1, animated: false });
+                            }
+                        } catch (scrollErr) {
+                            console.warn('Failed to scroll to last onboarding page:', scrollErr);
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error('Error retrieving user / AsyncStorage:', e);
+                // Fallback: just show onboarding normally
+            } finally {
+                if (mounted) setIsCheckingAuth(false);
+            }
+        })();
+        return () => { mounted = false; };
+    }, []);
 
     const handleStartChat = () => {
         router.push('/chat');
@@ -110,8 +161,22 @@ export default function LandingScreen() {
         }
     };
 
-    const handleSkip = () => {
+    const handleSkip = async () => {
+        try {
+            await AsyncStorage.setItem(ONBOARDING_SEEN_KEY, 'true');
+        } catch (e) {
+            console.error('Failed to persist onboarding-seen flag:', e);
+        }
         router.push('/chat');
+    };
+
+    const handleGetStarted = async () => {
+        try {
+            await AsyncStorage.setItem(ONBOARDING_SEEN_KEY, 'true');
+        } catch (e) {
+            console.error('Failed to persist onboarding-seen flag:', e);
+        }
+        handleStartChat();
     };
 
     const onViewableItemsChanged = useRef(({ viewableItems }) => {
@@ -253,6 +318,20 @@ export default function LandingScreen() {
         }
     };
 
+    // Show loading screen while checking auth
+    if (isCheckingAuth) {
+        return (
+            <View style={[styles.container, styles.loadingContainer]}>
+                <StatusBar style="light" />
+                <View style={styles.loadingLogo}>
+                    <MaterialCommunityIcons name="scale-balance" size={48} color={COLORS.primary} />
+                </View>
+                <Text style={styles.loadingTitle}>NyayaSahay</Text>
+                <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: SPACING.lg }} />
+            </View>
+        );
+    }
+
     return (
         <View style={styles.container}>
             <StatusBar style="light" />
@@ -302,7 +381,7 @@ export default function LandingScreen() {
                             </Pressable>
                         </>
                     ) : (
-                        <Pressable style={[styles.nextBtn, styles.fullWidthBtn]} onPress={handleStartChat}>
+                        <Pressable style={[styles.nextBtn, styles.fullWidthBtn]} onPress={handleGetStarted}>
                             <Text style={styles.nextBtnText}>Get Started</Text>
                             <Feather name="arrow-right" size={18} color="white" />
                         </Pressable>
@@ -317,6 +396,24 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.darkSurface,
+    },
+    loadingContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingLogo: {
+        width: 80,
+        height: 80,
+        borderRadius: 20,
+        backgroundColor: COLORS.primaryTransparent,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: SPACING.md,
+    },
+    loadingTitle: {
+        fontSize: 24,
+        fontFamily: 'Inter_700Bold',
+        color: COLORS.textWhite,
     },
     // Note: page width is now set dynamically via pageStyle in renderPage
 

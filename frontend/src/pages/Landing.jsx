@@ -194,9 +194,9 @@ function Landing({ onTryNow, onAuthClick }) {
                             </button>
                             <button
                                 className="btn btn-outline hero-cta-secondary"
-                                onClick={() => onAuthClick && onAuthClick('register')}
+                                onClick={() => onAuthClick && onAuthClick('signin')}
                             >
-                                Create Account
+                                Sign In
                             </button>
                         </div>
                     </div>

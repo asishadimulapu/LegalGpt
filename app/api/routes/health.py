@@ -4,7 +4,7 @@ Health check endpoints for monitoring application status.
 Includes connection pool monitoring for diagnosing DB starvation.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from typing import Dict, Any
 import logging
@@ -49,6 +49,7 @@ def get_pool_status() -> Dict[str, Any]:
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check(
+    request: Request,
     vector_store: VectorStoreManager = Depends(get_vector_store)
 ) -> HealthResponse:
     """
@@ -66,6 +67,11 @@ async def health_check(
     components = {}
     overall_healthy = True
     
+    # Check startup-level degradation flag
+    db_degraded = getattr(request.app.state, "db_degraded", False)
+    if db_degraded:
+        overall_healthy = False
+    
     # Check database connection and pool status
     try:
         db_healthy = check_db_connection()
@@ -76,7 +82,7 @@ async def health_check(
         pool_warning = pool_utilization > 0.8
         
         components["database"] = {
-            "status": "healthy" if db_healthy else "unhealthy",
+            "status": "healthy" if (db_healthy and not db_degraded) else "unhealthy",
             "type": "postgresql",
             "pool": pool_status,
             "pool_warning": pool_warning
