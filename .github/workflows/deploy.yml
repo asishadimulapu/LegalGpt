@@ -13,8 +13,8 @@ on:
 env:
   VM_PROJECT_DIR: /home/azureuser/nyayasahay
   REGISTRY: ghcr.io
-  BACKEND_IMAGE: ghcr.io/${{ github.repository }}/backend
-  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/frontend
+  BACKEND_IMAGE: ghcr.io/asishadimulapu/legalgpt/backend
+  FRONTEND_IMAGE: ghcr.io/asishadimulapu/legalgpt/frontend
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -89,6 +89,9 @@ jobs:
 
       - name: Deploy to VM
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USERNAME }}
@@ -96,16 +99,17 @@ jobs:
           port: 22
           timeout: 120s
           command_timeout: 10m
+          envs: GH_TOKEN,GH_ACTOR
           script: |
             echo "=========================================="
             echo "🚀 Starting Docker deployment at $(date)"
             echo "=========================================="
 
-            cd ${{ env.VM_PROJECT_DIR }}
+            cd /home/azureuser/nyayasahay
 
             # 1. Login to GitHub Container Registry
             echo "🔑 Logging in to ghcr.io..."
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
 
             # 2. Pull latest images
             echo "📥 Pulling latest images..."
