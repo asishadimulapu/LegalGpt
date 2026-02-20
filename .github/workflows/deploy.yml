@@ -66,7 +66,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ---------------------------------------------------------------------------
-  # Deploy to Azure VM via SSH + Docker Compose
+  # Deploy to Production VM via SSH
   # ---------------------------------------------------------------------------
   deploy:
     name: Deploy to Production
@@ -77,65 +77,63 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
       - name: Copy docker-compose to VM
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 22
-          source: "docker-compose.yml"
-          target: ${{ env.VM_PROJECT_DIR }}
+        run: |
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            docker-compose.yml \
+            ${{ secrets.VM_USERNAME }}@${{ secrets.VM_HOST }}:/home/azureuser/nyayasahay/docker-compose.yml
 
       - name: Deploy to VM
-        uses: appleboy/ssh-action@v1.2.0
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_ACTOR: ${{ github.actor }}
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 22
-          timeout: 120s
-          command_timeout: 10m
-          envs: GH_TOKEN,GH_ACTOR
-          script: |
-            echo "=========================================="
-            echo "🚀 Starting Docker deployment at $(date)"
-            echo "=========================================="
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ${{ secrets.VM_USERNAME }}@${{ secrets.VM_HOST }} << 'DEPLOY_SCRIPT'
+          
+          echo "=========================================="
+          echo "🚀 Starting Docker deployment at $(date)"
+          echo "=========================================="
 
-            cd /home/azureuser/nyayasahay
+          cd /home/azureuser/nyayasahay
 
-            # 1. Login to GitHub Container Registry
-            echo "🔑 Logging in to ghcr.io..."
-            echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
+          # 1. Login to GitHub Container Registry
+          echo "🔑 Logging in to ghcr.io..."
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-            # 2. Pull latest images
-            echo "📥 Pulling latest images..."
-            docker compose pull backend frontend
+          # 2. Pull latest images
+          echo "📥 Pulling latest images..."
+          docker compose pull backend frontend
 
-            # 3. Restart services
-            echo "🔄 Restarting services..."
-            docker compose up -d --no-deps --remove-orphans backend frontend
+          # 3. Restart services
+          echo "🔄 Restarting services..."
+          docker compose up -d --no-deps --remove-orphans backend frontend
 
-            # 4. Wait for health checks
-            echo "⏳ Waiting for services to start..."
-            sleep 15
+          # 4. Wait for health checks
+          echo "⏳ Waiting for services to start..."
+          sleep 15
 
-            # 5. Verify deployment
-            echo "🔍 Verifying deployment..."
-            curl -sf http://localhost:8000/health/live && echo "✓ Backend healthy" || echo "✗ Backend unhealthy"
-            curl -sf http://localhost/health-ping && echo "✓ Frontend healthy" || echo "✗ Frontend unhealthy"
+          # 5. Verify deployment
+          echo "🔍 Verifying deployment..."
+          curl -sf http://localhost:8000/health/live && echo "✓ Backend healthy" || echo "✗ Backend unhealthy"
+          curl -sf http://localhost/health-ping && echo "✓ Frontend healthy" || echo "✗ Frontend unhealthy"
 
-            # 6. Cleanup old images
-            docker image prune -f
+          # 6. Cleanup old images
+          docker image prune -f
 
-            echo "=========================================="
-            echo "✅ Deployment completed at $(date)"
-            echo "=========================================="
+          echo "=========================================="
+          echo "✅ Deployment completed at $(date)"
+          echo "=========================================="
+          DEPLOY_SCRIPT
 
-      # ----- Notify on failure -----
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
       - name: Notify on failure
         if: failure()
         run: echo "❌ Deployment failed! Check the logs above."
