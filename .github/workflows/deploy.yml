@@ -81,7 +81,11 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          # Strip Windows \r line endings that cause "error in libcrypto"
+          sed -i 's/\r$//' ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+          # Validate the key
+          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null 2>&1 && echo "✓ SSH key valid" || echo "✗ SSH key invalid"
           ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Copy docker-compose to VM
