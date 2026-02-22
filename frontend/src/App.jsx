@@ -1,14 +1,25 @@
 /**
- * Main App Component - Fixed Navigation
- * Routes and layout for NyayaSahay Legal Assistant
+ * Main App — Dual-branch SaaS Routing
+ *
+ * Guest  → GuestLayout  (Header + page + Footer)
+ * Auth   → AppShell     (Sidebar + page)
  */
 
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import React, { useState } from 'react';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+  useNavigate,
+  useLocation,
+} from 'react-router-dom';
 
-// Components
+// Layout components
 import Header from './components/Header';
 import Footer from './components/Footer';
+import AppShell from './components/AppShell';
 import AuthModal from './components/AuthModal';
 
 // Pages
@@ -20,163 +31,136 @@ import Terms from './pages/Terms';
 import Contact from './pages/Contact';
 import FAQ from './pages/FAQ';
 import Disclaimer from './pages/Disclaimer';
+import ProfileDashboard from './pages/ProfileDashboard';
 import AuthCallback from './pages/AuthCallback';
+import Rights from './pages/Rights';
 
 // Services
-import { registerUser, loginUser, validateToken } from './services/api';
+import { registerUser, loginUser } from './services/api';
 
-/**
- * App Layout Component — provides navigation context
- *
- * Viva Explanation:
- * - Central orchestrator for the entire web application UI
- * - Manages auth state with optimistic localStorage restore
- * - Routes users between Landing, Chat, and static pages
- * - Provides AuthModal for sign-in/register flows
- */
+/* ── Guest Layout (Header + Footer wrapper) ────────── */
+function GuestLayout({ onAuthClick }) {
+  return (
+    <>
+      <Header onAuthClick={onAuthClick} />
+      <Outlet />
+      <Footer />
+    </>
+  );
+}
+
+/* ── Root Layout ───────────────────────────────────── */
 function AppLayout() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [authModal, setAuthModal] = useState({ isOpen: false, mode: 'signin' });
-  const [user, setUser] = useState(null);
-
-  // Optimistic session restore: set user immediately, validate token in background.
-  // This eliminates the race condition where Chat.jsx renders before
-  // token validation completes, making the user appear logged-out.
-  useEffect(() => {
-    const saved = localStorage.getItem('nyayasahay_user');
-    if (saved) {
-      try {
-        const userData = JSON.parse(saved);
-        // Optimistic: show user instantly (prevents flash of logged-out state)
-        setUser(userData);
-
-        // Background: validate token — if invalid, clear state silently
-        const originalToken = userData.token;
-        validateToken(userData.token).then(isValid => {
-          if (!isValid) {
-            // Re-read localStorage to avoid clearing a newer session
-            const current = localStorage.getItem('nyayasahay_user');
-            if (current) {
-              try {
-                const currentData = JSON.parse(current);
-                if (currentData.token !== originalToken) return; // stale validation
-              } catch { /* corrupted — clear below */ }
-            }
-            console.log('Session expired, logging out');
-            localStorage.removeItem('nyayasahay_user');
-            setUser(null);
-          }
-        }).catch((err) => {
-          // Only suppress expected network/offline errors
-          if (!navigator.onLine || err?.name === 'TypeError' || err?.message?.includes('fetch')) {
-            console.log('Token validation skipped (offline/network error)');
-          } else {
-            console.error('Unexpected error during token validation:', err);
-          }
-        });
-      } catch {
-        // Corrupted localStorage entry
-        localStorage.removeItem('nyayasahay_user');
-      }
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nyayasahay_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      localStorage.removeItem('nyayasahay_user');
+      return null;
     }
-  }, []);
+  });
 
-  // Handle auth modal
-  const handleAuthClick = (mode) => {
-    setAuthModal({ isOpen: true, mode });
-  };
+  const isAuthenticated = !!user;
 
-  const handleAuthClose = () => {
-    setAuthModal({ isOpen: false, mode: 'signin' });
-  };
+  // ── Auth helpers ──────────────────────────────────
+  const openAuth = (mode) => setAuthModal({ isOpen: true, mode });
+  const closeAuth = () => setAuthModal({ isOpen: false, mode: 'signin' });
+  const switchAuth = (mode) => setAuthModal({ isOpen: true, mode });
 
-  const handleAuthSwitch = (mode) => {
-    setAuthModal({ isOpen: true, mode });
-  };
-
-  // Handle auth submission
   const handleAuthSubmit = async (formData) => {
     try {
       if (authModal.mode === 'signin') {
-        const response = await loginUser(formData.email, formData.password);
-        const userData = { email: formData.email, token: response.access_token };
-        setUser(userData);
-        localStorage.setItem('nyayasahay_user', JSON.stringify(userData));
-        handleAuthClose();
+        const res = await loginUser(formData.email, formData.password);
+        const u = { email: formData.email, token: res.access_token };
+        setUser(u);
+        localStorage.setItem('nyayasahay_user', JSON.stringify(u));
+        closeAuth();
         navigate('/chat');
       } else {
         await registerUser(formData.name, formData.email, formData.password);
-        // Auto login after registration
-        const loginResponse = await loginUser(formData.email, formData.password);
-        const userData = { email: formData.email, name: formData.name, token: loginResponse.access_token };
-        setUser(userData);
-        localStorage.setItem('nyayasahay_user', JSON.stringify(userData));
-        handleAuthClose();
+        const res = await loginUser(formData.email, formData.password);
+        const u = { email: formData.email, name: formData.name, token: res.access_token };
+        setUser(u);
+        localStorage.setItem('nyayasahay_user', JSON.stringify(u));
+        closeAuth();
         navigate('/chat');
       }
-    } catch (error) {
-      throw error;
+    } catch (err) {
+      throw err;
     }
   };
 
-  // Handle logout
+  const handleLoginSuccess = (userData) => {
+    setUser(userData);
+    localStorage.setItem('nyayasahay_user', JSON.stringify(userData));
+  };
+
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem('nyayasahay_user');
     navigate('/');
   };
 
-  // Navigate to chat (Start Free Consultation button)
-  const handleTryNow = () => {
-    navigate('/chat');
-  };
+  const handleTryNow = () => navigate('/chat');
 
-  // Handle OAuth login success
-  const handleOAuthSuccess = (userData) => {
-    setUser(userData);
-  };
-
-  // Don't show header/footer on chat page for fullscreen experience
-  const isChatPage = location.pathname === '/chat';
-
+  // ── Routes ────────────────────────────────────────
   return (
     <>
-      {!isChatPage && <Header onAuthClick={handleAuthClick} user={user} onLogout={handleLogout} />}
-
       <Routes>
-        <Route path="/" element={<Landing onTryNow={handleTryNow} onAuthClick={handleAuthClick} />} />
-        <Route path="/chat" element={<Chat user={user} onAuthClick={handleAuthClick} onLogout={handleLogout} />} />
-        <Route path="/auth/callback" element={<AuthCallback onLoginSuccess={handleOAuthSuccess} />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/privacy" element={<Privacy />} />
-        <Route path="/terms" element={<Terms />} />
-        <Route path="/contact" element={<Contact />} />
-        <Route path="/faq" element={<FAQ />} />
-        <Route path="/disclaimer" element={<Disclaimer />} />
-        <Route path="/features" element={<Landing onTryNow={handleTryNow} onAuthClick={handleAuthClick} />} />
-        <Route path="/how-it-works" element={<Landing onTryNow={handleTryNow} onAuthClick={handleAuthClick} />} />
-        <Route path="/your-rights" element={<Landing onTryNow={handleTryNow} onAuthClick={handleAuthClick} />} />
-        <Route path="/resources" element={<Landing onTryNow={handleTryNow} onAuthClick={handleAuthClick} />} />
-        <Route path="*" element={<Landing onTryNow={handleTryNow} onAuthClick={handleAuthClick} />} />
+        {/* OAuth callback — outside any layout */}
+        <Route path="/auth/callback" element={<AuthCallback onLoginSuccess={handleLoginSuccess} />} />
+
+        {isAuthenticated ? (
+          /* ═══ Authenticated: App Shell ═══ */
+          <Route path="/" element={<AppShell user={user} onLogout={handleLogout} />}>
+            <Route index element={<Navigate to="/chat" replace />} />
+            <Route path="chat" element={<Chat user={user} onLogout={handleLogout} />} />
+            <Route path="rights" element={<Rights />} />
+            <Route path="profile" element={<ProfileDashboard user={user} onLogout={handleLogout} />} />
+            <Route path="about" element={<About />} />
+            <Route path="privacy" element={<Privacy />} />
+            <Route path="terms" element={<Terms />} />
+            <Route path="contact" element={<Contact />} />
+            <Route path="faq" element={<FAQ />} />
+            <Route path="disclaimer" element={<Disclaimer />} />
+            <Route path="*" element={<Navigate to="/chat" replace />} />
+          </Route>
+        ) : (
+          /* ═══ Guest ═══ */
+          <>
+            {/* Chat is full-screen — no Header/Footer */}
+            <Route path="/chat" element={<Chat user={null} onAuthClick={openAuth} />} />
+
+            {/* Everything else gets the standard landing layout */}
+            <Route path="/" element={<GuestLayout onAuthClick={openAuth} />}>
+              <Route index element={<Landing onTryNow={handleTryNow} onAuthClick={openAuth} />} />
+              <Route path="about" element={<About />} />
+              <Route path="privacy" element={<Privacy />} />
+              <Route path="terms" element={<Terms />} />
+              <Route path="contact" element={<Contact />} />
+              <Route path="faq" element={<FAQ />} />
+              <Route path="disclaimer" element={<Disclaimer />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </>
+        )}
       </Routes>
 
-      {!isChatPage && <Footer />}
-
+      {/* Auth Modal (always mounted for animation safety) */}
       <AuthModal
         isOpen={authModal.isOpen}
         mode={authModal.mode}
-        onClose={handleAuthClose}
+        onClose={closeAuth}
         onSubmit={handleAuthSubmit}
-        onSwitchMode={handleAuthSwitch}
+        onSwitchMode={switchAuth}
       />
     </>
   );
 }
 
-/**
- * App Component
- */
 function App() {
   return (
     <Router>

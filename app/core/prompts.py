@@ -133,6 +133,48 @@ Answer the current question based on the provided legal context. You may use the
 
 
 # =============================================================================
+# Memory-Augmented QA Template (Per-User Long-Term Memory)
+# =============================================================================
+MEMORY_AUGMENTED_QA_TEMPLATE = """## CONTEXT (Indian Legal Documents):
+{context}
+
+---
+
+## USER PROFILE:
+{user_profile}
+
+---
+
+## PREVIOUS CONVERSATION (this session):
+{chat_history}
+
+---
+
+## RELEVANT MEMORIES (from user's past sessions):
+{memory_context}
+
+---
+
+## USER QUESTION:
+{question}
+
+---
+
+## INSTRUCTIONS:
+1. Answer the user's question based ONLY on the legal CONTEXT documents above.
+2. You may use the PREVIOUS CONVERSATION and MEMORIES to understand what the user
+   is referring to (e.g., \"my earlier question about Section 498A\"), but your
+   legal answer must come ONLY from the CONTEXT.
+3. If user location is known, tailor answers to state-specific rules only when those rules
+   are present in the CONTEXT (do not infer or pull state rules from training data).
+4. Cite sources as [Act Name, Section X].
+5. If the information is NOT in the CONTEXT, say so — do NOT fabricate legal provisions.
+6. Quote relevant legal text when helpful.
+
+## YOUR ANSWER:"""
+
+
+# =============================================================================
 # Document Analysis Prompt (For uploaded documents)
 # =============================================================================
 DOCUMENT_ANALYSIS_PROMPT = """You are an expert Indian Law Analyst. Analyze the following uploaded legal document and answer the user's question.

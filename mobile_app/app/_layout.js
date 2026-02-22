@@ -19,14 +19,7 @@ import { getUser, clearUser, getChatSessions } from '../services/api';
 // Keep splash screen visible while loading fonts
 SplashScreen.preventAutoHideAsync();
 
-/**
- * CustomDrawerContent - Drawer sidebar replicating web app navigation.
- *
- * Viva Explanation:
- * - Manages auth state (login/logout) and displays user info
- * - Shows recent chat sessions and quick-question shortcuts
- * - Clears onboarding-seen flag on logout for fresh welcome experience
- */
+// Custom Drawer Content - Pixel-perfect replica of web sidebar
 function CustomDrawerContent(props) {
     const router = useRouter();
     const pathname = usePathname();
@@ -65,6 +58,11 @@ function CustomDrawerContent(props) {
         }
     };
 
+    const loadUser = async () => {
+        const userData = await getUser();
+        setUser(userData);
+    };
+
     const loadSessions = async () => {
         setLoadingSessions(true);
         try {
@@ -79,11 +77,6 @@ function CustomDrawerContent(props) {
 
     const handleLogout = async () => {
         await clearUser();
-        // Clear onboarding flag so user sees welcome on next visit
-        try {
-            const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-            await AsyncStorage.removeItem('nyayasahay_onboarding_seen');
-        } catch (_e) { /* non-critical */ }
         setUser(null);
         setSessions([]);
         router.replace('/');
@@ -126,7 +119,6 @@ function CustomDrawerContent(props) {
                     <Ionicons name="add" size={20} color="white" />
                     <Text style={styles.newChatBtnText}>New Chat</Text>
                 </Pressable>
-
 
                 {/* Chat History (if logged in) */}
                 {user && (
@@ -246,18 +238,10 @@ function CustomDrawerContent(props) {
                     </Pressable>
                 )}
             </View>
-        </View >
+        </View>
     );
 }
 
-/**
- * RootLayout - Root drawer navigator.
- *
- * Viva Explanation:
- * - Loads Inter fonts and hides splash once ready
- * - Configures the swipeable drawer with all app screens
- * - Initial route is index (onboarding), which auto-redirects logged-in users
- */
 export default function RootLayout() {
     const [fontsLoaded] = useFonts({
         Inter_400Regular,
@@ -294,7 +278,6 @@ export default function RootLayout() {
                 <Drawer.Screen name="chat" options={{ drawerItemStyle: { display: 'none' } }} />
                 <Drawer.Screen name="about" options={{ drawerItemStyle: { display: 'none' } }} />
                 <Drawer.Screen name="auth" options={{ drawerItemStyle: { display: 'none' } }} />
-
                 <Drawer.Screen name="faq" options={{ drawerItemStyle: { display: 'none' } }} />
                 <Drawer.Screen name="privacy" options={{ drawerItemStyle: { display: 'none' } }} />
                 <Drawer.Screen name="terms" options={{ drawerItemStyle: { display: 'none' } }} />

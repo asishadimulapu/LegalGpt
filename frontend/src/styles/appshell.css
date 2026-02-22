@@ -1,0 +1,81 @@
+/**
+ * App Shell Layout Styles
+ */
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Main content area ─────────────────────────────── */
+.app-main {
+  flex: 1;
+  margin-left: 250px;
+  min-height: 100vh;
+  background: var(--light-bg);
+  transition: margin-left 0.2s ease;
+}
+
+.shell-chat .app-main {
+  margin-left: 64px;
+}
+
+/* ── Mobile top-bar (hidden on desktop) ────────────── */
+.mobile-topbar {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: var(--dark-surface);
+  color: white;
+  align-items: center;
+  padding: 0 var(--spacing-md);
+  gap: var(--spacing-sm);
+  z-index: 90;
+  border-bottom: 1px solid var(--border-dark);
+}
+
+.mobile-menu-btn {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: var(--spacing-xs);
+}
+
+.mobile-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.mobile-brand-icon {
+  width: 28px;
+  height: 28px;
+  background: var(--primary);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Responsive ────────────────────────────────────── */
+@media (max-width: 768px) {
+  .app-main {
+    margin-left: 0;
+    padding-top: 56px;
+  }
+
+  .shell-chat .app-main {
+    margin-left: 0;
+    padding-top: 56px;
+  }
+
+  .mobile-topbar {
+    display: flex;
+  }
+}

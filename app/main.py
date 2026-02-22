@@ -19,7 +19,7 @@ import time
 from app.config import settings
 from app.db.database import init_db
 from app.core.vector_store import vector_store_manager
-from app.api.routes import health, chat, retrieval, auth, upload, guides
+from app.api.routes import health, chat, retrieval, auth, upload, guides, profile
 from app.utils.logging_config import setup_logging
 
 # Initialize logging
@@ -174,13 +174,18 @@ app.add_middleware(
 # This ensures preflight OPTIONS requests are handled before other middleware
 cors_origins = settings.get_cors_origins  # Call the property to get the list
 if "*" not in cors_origins:
-    # Always allow localhost for development
+    # Always allow production domain
     cors_origins = list(set(cors_origins + [
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
+        "https://law-gpt.app",
     ]))
+    # Also allow localhost for development
+    if settings.is_development:
+        cors_origins.extend([
+            "http://localhost:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:5174",
+        ])
 
 app.add_middleware(
     CORSMiddleware,
@@ -247,6 +252,7 @@ app.include_router(retrieval.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(upload.router, prefix="/api/v1")
 app.include_router(guides.router, prefix="/api/v1")
+app.include_router(profile.router, prefix="/api/v1")
 
 
 # =============================================================================
@@ -268,6 +274,7 @@ async def root():
             "retrieve": "/api/v1/retrieve",
             "auth": "/api/v1/auth",
             "guides": "/api/v1/guides",
-            "upload": "/api/v1/upload"
+            "upload": "/api/v1/upload",
+            "profile": "/api/v1/profile"
         }
     }

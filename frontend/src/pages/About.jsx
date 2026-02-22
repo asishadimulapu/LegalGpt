@@ -29,6 +29,7 @@ import '../styles/about.css';
 
 function About() {
     const [isVisible, setIsVisible] = useState(false);
+    const isAuthenticated = !!localStorage.getItem('nyayasahay_user');
 
     useEffect(() => {
         setIsVisible(true);
@@ -93,9 +94,11 @@ function About() {
                     </div>
                 </div>
                 <div className="about-hero-content">
-                    <Link to="/" className="back-link">
-                        <ArrowLeft size={20} /> Back to Home
-                    </Link>
+                    {!isAuthenticated && (
+                        <Link to="/" className="back-link">
+                            <ArrowLeft size={20} /> Back to Home
+                        </Link>
+                    )}
                     <div className="about-hero-text">
                         <div className="about-badge">
                             <Scale size={20} /> About NyayaSahay
@@ -316,18 +319,20 @@ function About() {
                 </div>
             </section>
 
-            {/* CTA Section */}
-            <section className="about-cta">
-                <div className="container">
-                    <div className="cta-content">
-                        <h2>Ready to Try <span className="gradient-text">NyayaSahay?</span></h2>
-                        <p>Start asking your legal questions now</p>
-                        <Link to="/chat" className="btn btn-primary">
-                            Start Free Consultation
-                        </Link>
+            {/* CTA Section — Guest only */}
+            {!isAuthenticated && (
+                <section className="about-cta">
+                    <div className="container">
+                        <div className="cta-content">
+                            <h2>Ready to Try <span className="gradient-text">NyayaSahay?</span></h2>
+                            <p>Start asking your legal questions now</p>
+                            <Link to="/chat" className="btn btn-primary">
+                                Start Free Consultation
+                            </Link>
+                        </div>
                     </div>
-                </div>
-            </section>
+                </section>
+            )}
         </div>
     );
 }

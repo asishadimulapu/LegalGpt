@@ -144,7 +144,7 @@ function Landing({ onTryNow, onAuthClick }) {
         },
     ];
 
-    // Handle button click - navigate to chat
+    // Handle button click - navigate to chat (works for guests too)
     const handleStartChat = () => {
         navigate('/chat');
     };

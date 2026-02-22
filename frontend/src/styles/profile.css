@@ -1,0 +1,1205 @@
+/**
+ * Profile Dashboard — Production-Level Styles
+ * Stripe / Notion / Linear inspired dark SaaS design
+ *
+ * Design tokens: uses CSS vars from index.css
+ * Prefixed with `pf-` to avoid global collisions
+ */
+
+/* ══════════════════════════════════════════════════════════════
+   Page Shell
+   ══════════════════════════════════════════════════════════════ */
+
+.pf-page {
+  min-height: 100vh;
+  background: var(--dark-bg);
+  color: var(--text-white);
+  font-family: var(--font-sans);
+}
+
+.pf-shell {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 32px 64px;
+}
+
+.pf-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 12px;
+  color: var(--text-light);
+}
+
+.pf-loader .spin,
+.spin {
+  animation: pf-spin 1s linear infinite;
+}
+
+@keyframes pf-spin {
+  to { transform: rotate(360deg); }
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Toast
+   ══════════════════════════════════════════════════════════════ */
+
+.pf-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 0.84rem;
+  font-weight: 500;
+  z-index: 1000;
+  animation: pf-slideIn 0.3s ease;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.pf-toast.success {
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+.pf-toast.error {
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+@keyframes pf-slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Breadcrumb
+   ══════════════════════════════════════════════════════════════ */
+
+.pf-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.pf-breadcrumb a {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.pf-breadcrumb a:hover {
+  color: var(--primary);
+}
+
+.pf-crumb-current {
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Page Header
+   ══════════════════════════════════════════════════════════════ */
+
+.pf-page-header {
+  margin-bottom: 28px;
+}
+
+.pf-page-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--text-white);
+  letter-spacing: -0.02em;
+}
+
+.pf-page-desc {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Hero Card (Avatar + Info + Quick Actions)
+   ══════════════════════════════════════════════════════════════ */
+
+.pf-hero {
+  background: var(--dark-card);
+  border: 1px solid var(--border-dark);
+  border-radius: 16px;
+  padding: 32px;
+  margin-bottom: 20px;
+  transition: border-color 0.2s;
+}
+
+.pf-hero:hover {
+  border-color: rgba(55, 65, 81, 0.7);
+}
+
+.pf-hero-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+}
+
+/* ── Avatar with gradient ring ─────────────────────── */
+
+.pf-avatar-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.pf-avatar-ring {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  padding: 3px;
+  background: conic-gradient(
+    var(--primary) 0deg,
+    var(--accent-blue) 120deg,
+    var(--accent-purple) 240deg,
+    var(--primary) 360deg
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pf-avatar-img {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--dark-card);
+}
+
+.pf-avatar-fallback {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: var(--dark-surface);
+  border: 3px solid var(--dark-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+}
+
+.pf-provider {
+  position: absolute;
+  bottom: 2px;
+  right: -4px;
+  font-size: 0.56rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 2px solid var(--dark-card);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.pf-provider.google {
+  background: #4285f4;
+  color: white;
+}
+
+.pf-provider.local {
+  background: var(--primary);
+  color: white;
+}
+
+/* ── Hero Info ─────────────────────────────────────── */
+
+.pf-hero-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.pf-name {
+  font-size: 1.3rem;
+  font-weight: 700;
+  font-family: var(--font-serif);
+  color: var(--text-white);
+  letter-spacing: -0.01em;
+}
+
+.pf-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--text-light);
+}
+
+.pf-meta.muted {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+/* ── Hero Actions ──────────────────────────────────── */
+
+.pf-hero-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── Edit Inputs ───────────────────────────────────── */
+
+.pf-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-dark);
+  border-radius: 8px;
+  padding: 7px 12px;
+  color: var(--text-white);
+  font-size: 0.88rem;
+  font-family: var(--font-sans);
+  outline: none;
+  width: 100%;
+  transition: border-color 0.2s;
+}
+
+.pf-input:focus {
+  border-color: var(--primary);
+}
+
+.pf-input-name {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.pf-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-light);
+}
+
+.pf-input-row .pf-input {
+  flex: 1;
+}
+
+
+/* ── Quick Actions ─────────────────────────────────── */
+
+.pf-quick-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-dark);
+}
+
+.pf-qa {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-dark);
+  border-radius: 12px;
+  color: var(--text-light);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.pf-qa:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: rgba(38, 184, 184, 0.05);
+}
+
+.pf-qa:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.pf-qa-arrow {
+  margin-left: auto;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: all 0.2s;
+}
+
+.pf-qa:hover .pf-qa-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Stats Row
+   ══════════════════════════════════════════════════════════════ */
+
+.pf-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.pf-stat {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--dark-card);
+  border: 1px solid var(--border-dark);
+  border-radius: 14px;
+  padding: 18px 20px;
+  transition: all 0.2s;
+}
+
+.pf-stat:hover {
+  border-color: rgba(38, 184, 184, 0.25);
+  transform: translateY(-1px);
+}
+
+.pf-stat-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pf-stat-icon.sessions {
+  background: rgba(38, 184, 184, 0.12);
+  color: var(--primary);
+}
+
+.pf-stat-icon.messages {
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--accent-blue);
+}
+
+.pf-stat-icon.memories {
+  background: rgba(139, 92, 246, 0.12);
+  color: var(--accent-purple);
+}
+
+.pf-stat-icon.languages {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--accent-orange);
+}
+
+.pf-stat-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.pf-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-white);
+  line-height: 1;
+}
+
+.pf-stat-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Tabs
+   ══════════════════════════════════════════════════════════════ */
+
+.pf-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--dark-card);
+  border: 1px solid var(--border-dark);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 20px;
+}
+
+.pf-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.pf-tab:hover {
+  color: var(--text-light);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.pf-tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.pf-tab.active:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.pf-tab.active {
+  color: var(--primary);
+  background: rgba(38, 184, 184, 0.1);
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Content Area
+   ══════════════════════════════════════════════════════════════ */
+
+.pf-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Card
+   ══════════════════════════════════════════════════════════════ */
+
+.pf-card {
+  background: var(--dark-card);
+  border: 1px solid var(--border-dark);
+  border-radius: 16px;
+  padding: 28px 32px;
+  transition: border-color 0.2s;
+}
+
+.pf-card:hover {
+  border-color: rgba(55, 65, 81, 0.65);
+}
+
+.pf-card-head {
+  margin-bottom: 20px;
+}
+
+.pf-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-white);
+  margin-bottom: 4px;
+}
+
+.pf-card-title svg {
+  color: var(--primary);
+}
+
+.pf-card-desc {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Language Grid
+   ══════════════════════════════════════════════════════════════ */
+
+.pf-lang-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.pf-lang {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-dark);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-light);
+}
+
+.pf-lang:hover {
+  border-color: var(--primary);
+  background: rgba(38, 184, 184, 0.04);
+}
+
+.pf-lang:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.pf-lang.selected:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.pf-lang.selected {
+  border-color: var(--primary);
+  background: rgba(38, 184, 184, 0.1);
+  color: var(--primary);
+}
+
+.pf-lang-native {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.pf-lang-label {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.pf-lang.selected .pf-lang-label {
+  color: var(--primary-dark);
+}
+
+.pf-lang-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  background: rgba(38, 184, 184, 0.06);
+  border: 1px solid rgba(38, 184, 184, 0.2);
+  border-radius: 10px;
+  color: var(--primary);
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+
+.pf-lang-code {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Interest Chips
+   ══════════════════════════════════════════════════════════════ */
+
+.pf-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.pf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-dark);
+  border-radius: 999px;
+  color: var(--text-light);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pf-chip:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.pf-chip:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.pf-chip.selected:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.pf-chip.selected {
+  background: rgba(38, 184, 184, 0.1);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.pf-chip.suggested {
+  background: rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.25);
+  color: var(--accent-purple);
+  cursor: default;
+}
+
+.pf-chips-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0 0;
+  font-size: 0.82rem;
+  color: var(--primary);
+}
+
+.pf-chips-footer span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Memory Section
+   ══════════════════════════════════════════════════════════════ */
+
+.pf-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.pf-filter {
+  padding: 5px 13px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-dark);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pf-filter:hover {
+  color: var(--text-light);
+  border-color: var(--text-muted);
+}
+
+.pf-filter:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.pf-filter.active {
+  background: rgba(38, 184, 184, 0.1);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.pf-filter-count {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.pf-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 0;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.pf-mem-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pf-mem {
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-dark);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pf-mem:hover {
+  border-color: rgba(55, 65, 81, 0.8);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.pf-mem.open {
+  border-color: rgba(38, 184, 184, 0.25);
+}
+
+.pf-mem-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.pf-mem-badge {
+  display: inline-flex;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pf-mem-badge.conversation_summary {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent-blue);
+}
+
+.pf-mem-badge.user_fact {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--accent-green);
+}
+
+.pf-mem-date {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.pf-mem-text {
+  font-size: 0.83rem;
+  color: var(--text-light);
+  line-height: 1.6;
+  margin-bottom: 4px;
+}
+
+.pf-mem-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Privacy Section
+   ══════════════════════════════════════════════════════════════ */
+
+.pf-privacy-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pf-priv-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-dark);
+  border-radius: 12px;
+  transition: all 0.2s;
+}
+
+.pf-priv-row:hover {
+  border-color: rgba(55, 65, 81, 0.8);
+}
+
+.pf-priv-row.danger {
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.pf-priv-row.danger:hover {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.pf-priv-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pf-priv-icon.export {
+  background: rgba(38, 184, 184, 0.1);
+  color: var(--primary);
+}
+
+.pf-priv-icon.clear {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+}
+
+.pf-priv-icon.danger {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.pf-priv-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pf-priv-info h4 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-white);
+  margin-bottom: 2px;
+}
+
+.pf-priv-info p {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Compliance
+   ══════════════════════════════════════════════════════════════ */
+
+.pf-compliance {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.pf-compliance-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: 10px;
+  border: 1px solid rgba(55, 65, 81, 0.3);
+}
+
+.pf-compliance-item svg {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.pf-compliance-item strong {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--text-white);
+}
+
+.pf-compliance-item span {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Buttons (pf- prefixed)
+   ══════════════════════════════════════════════════════════════ */
+
+.pf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.pf-btn-sm {
+  padding: 7px 14px;
+  font-size: 0.78rem;
+}
+
+.pf-btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.pf-btn-primary:hover {
+  background: var(--primary-dark);
+}
+
+.pf-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.pf-btn-primary:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.pf-btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pf-btn-outline {
+  background: none;
+  border: 1px solid var(--border-dark);
+  color: var(--text-light);
+}
+
+.pf-btn-outline:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.pf-btn-ghost {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-light);
+}
+
+.pf-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.pf-btn-warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.pf-btn-warning:hover {
+  background: rgba(245, 158, 11, 0.22);
+}
+
+.pf-btn-danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.pf-btn-danger:hover {
+  background: rgba(239, 68, 68, 0.22);
+}
+
+.pf-btn-danger-outline {
+  background: none;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #ef4444;
+}
+
+.pf-btn-danger-outline:hover {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Delete Modal
+   ══════════════════════════════════════════════════════════════ */
+
+.pf-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(4px);
+  animation: pf-fadeIn 0.2s ease;
+}
+
+@keyframes pf-fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.pf-modal {
+  background: var(--dark-card);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 16px;
+  padding: 36px;
+  max-width: 420px;
+  width: 90%;
+  text-align: center;
+}
+
+.pf-modal-icon {
+  color: #ef4444;
+  margin-bottom: 12px;
+}
+
+.pf-modal h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-white);
+  margin-bottom: 8px;
+}
+
+.pf-modal p {
+  font-size: 0.84rem;
+  color: var(--text-light);
+  margin-bottom: 8px;
+}
+
+.pf-modal ul {
+  text-align: left;
+  padding-left: 20px;
+  margin-bottom: 12px;
+}
+
+.pf-modal li {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.pf-modal-warn {
+  color: #ef4444 !important;
+  font-weight: 500;
+}
+
+.pf-modal-btns {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Responsive
+   ══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 900px) {
+  .pf-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .pf-quick-actions {
+    flex-wrap: wrap;
+  }
+
+  .pf-qa {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .pf-shell {
+    padding: 20px 16px 48px;
+  }
+
+  .pf-hero {
+    padding: 24px 20px;
+  }
+
+  .pf-hero-top {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .pf-hero-actions {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .pf-quick-actions {
+    flex-direction: column;
+  }
+
+  .pf-qa {
+    flex: 1;
+  }
+
+  .pf-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .pf-card {
+    padding: 20px 18px;
+  }
+
+  .pf-priv-row {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .pf-compliance {
+    grid-template-columns: 1fr;
+  }
+
+  .pf-lang-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .pf-tabs {
+    overflow-x: auto;
+  }
+
+  .pf-tab {
+    padding: 9px 12px;
+    font-size: 0.78rem;
+  }
+
+  .pf-modal-btns {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .pf-stats {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .pf-stat {
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .pf-stat-value {
+    font-size: 1.2rem;
+  }
+
+  .pf-lang-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .pf-page-title {
+    font-size: 1.3rem;
+  }
+}

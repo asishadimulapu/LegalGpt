@@ -12,9 +12,11 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db, get_independent_session
 from app.db.models import User, MessageRole
-from app.db.crud import ChatSessionCRUD, ChatMessageCRUD, QueryLogCRUD
+from app.db.crud import ChatSessionCRUD, ChatMessageCRUD, QueryLogCRUD, UserProfileCRUD
 from app.api.dependencies import get_current_user_optional, get_rag_pipeline_dep # Kept get_current_user_optional, get_rag_pipeline_dep
 from app.core.rag_pipeline import RAGPipeline # Removed LegalSource from here, it's in schemas
+from app.core.translation import translate_to_english, translate_from_english
+from app.core.memory import store_conversation_summary, summarise_session_for_memory, get_short_term_context
 from app.schemas.chat import (
     ChatRequest, ChatResponse, 
     ChatSessionSchema, ChatSessionDetailSchema, ChatMessageSchema,
@@ -60,6 +62,25 @@ async def chat(
     """
     user_id = user.id if user else None
     
+    # ── Translation: detect language & translate to English ──
+    original_query = request.query
+    detected_lang = "en"
+    try:
+        # If user has a saved preferred language, use it as hint
+        source_hint = None
+        if user:
+            profile = UserProfileCRUD.get_or_create(db, user.id)
+            source_hint = profile.preferred_language
+        translated_query, detected_lang = translate_to_english(
+            request.query, source_lang=source_hint
+        )
+        # Update user's preferred language if auto-detected
+        if user and detected_lang != "en":
+            UserProfileCRUD.update(db, user.id, preferred_language=detected_lang)
+    except Exception as e:
+        logger.warning(f"Translation failed, using original query: {e}")
+        translated_query = request.query
+    
     # Get or create chat session
     if request.session_id:
         session = ChatSessionCRUD.get_by_id(db, request.session_id)
@@ -73,22 +94,35 @@ async def chat(
         title = request.query[:50] + "..." if len(request.query) > 50 else request.query
         session = ChatSessionCRUD.create(db, user_id=user_id, title=title)
     
-    # Store user message
+    # Store user message (original language)
     ChatMessageCRUD.create(
         db=db,
         session_id=session.id,
         role=MessageRole.USER,
-        content=request.query
+        content=original_query
     )
     
     try:
-        # Execute RAG pipeline
-        answer, sources, is_fallback, latency_ms = rag.query(request.query)
+        # Execute RAG pipeline with memory context
+        answer, sources, is_fallback, latency_ms = rag.query(
+            translated_query,
+            db=db,
+            user_id=user_id,
+            session_id=session.id
+        )
         
         # Convert sources to dict for storage
         sources_dict = [s.model_dump() for s in sources]
         
-        # Store assistant message
+        # ── Translate response back to user's language ──
+        display_answer = answer
+        if detected_lang != "en":
+            try:
+                display_answer = translate_from_english(answer, detected_lang)
+            except Exception as e:
+                logger.warning(f"Response translation failed: {e}")
+        
+        # Store assistant message (English canonical form)
         ChatMessageCRUD.create(
             db=db,
             session_id=session.id,
@@ -96,6 +130,17 @@ async def chat(
             content=answer,
             sources=sources_dict
         )
+        
+        # ── Store conversation summary as long-term memory ──
+        if user_id and not is_fallback:
+            try:
+                short_ctx = get_short_term_context(db, session.id, max_messages=4)
+                summary = summarise_session_for_memory(short_ctx, llm=rag.llm)
+                store_conversation_summary(
+                    db, user_id, session.id, summary, importance=0.6
+                )
+            except Exception as e:
+                logger.warning(f"Memory storage failed (non-fatal): {e}")
         
         # Log query for analytics
         QueryLogCRUD.create(
@@ -115,7 +160,7 @@ async def chat(
         )
         
         return ChatResponse(
-            answer=answer,
+            answer=display_answer,
             sources=sources,
             session_id=session.id,
             is_fallback=is_fallback,

@@ -464,6 +464,170 @@ class DocumentEmbedding(Base):
 
 
 # =============================================================================
+# User Profile Model (Per-User Context & Preferences)
+# =============================================================================
+class UserProfile(Base):
+    """
+    Extended user profile storing legal context and preferences.
+    Enables personalized responses based on user's case history.
+    
+    Viva Explanation:
+    - Stores user-specific details (location, case type, language)
+    - Isolated per-user — no cross-user leakage
+    - Used by RAG pipeline to personalize retrieval and responses
+    """
+    __tablename__ = "user_profiles"
+    
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        comment="Unique profile identifier"
+    )
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+        comment="Owner user — one profile per user"
+    )
+    location = Column(
+        String(255),
+        nullable=True,
+        comment="User's location/state (for jurisdiction context)"
+    )
+    case_types = Column(
+        JSONB,
+        nullable=True,
+        default=list,
+        comment="List of case types user has asked about"
+    )
+    preferred_language = Column(
+        String(10),
+        nullable=True,
+        default="en",
+        comment="ISO 639-1 language code (e.g., hi, ta, te, en)"
+    )
+    legal_interests = Column(
+        JSONB,
+        nullable=True,
+        default=list,
+        comment="Topics of interest (e.g., property law, criminal law)"
+    )
+    extra_context = Column(
+        JSONB,
+        nullable=True,
+        default=dict,
+        comment="Arbitrary per-user context (key-value)"
+    )
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+    
+    # Relationship
+    user = relationship("User", backref="profile")
+    
+    def __repr__(self) -> str:
+        return f"<UserProfile(user_id={self.user_id}, lang={self.preferred_language})>"
+
+
+# =============================================================================
+# User Memory Model (Long-Term Persistent Memory per User)
+# =============================================================================
+class UserMemory(Base):
+    """
+    Per-user long-term memory entries.
+    Stores summarized conversation insights for future recall.
+    
+    Viva Explanation:
+    - Each row is a memory "fact" extracted from conversations
+    - memory_type distinguishes: 'conversation_summary', 'user_fact', 'case_detail'
+    - Indexed by user_id — queries are always scoped to one user
+    - Optional embedding for semantic memory search
+    """
+    __tablename__ = "user_memories"
+    
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        comment="Unique memory entry identifier"
+    )
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Owner user — strict isolation"
+    )
+    memory_type = Column(
+        String(50),
+        nullable=False,
+        index=True,
+        comment="Type: conversation_summary, user_fact, case_detail, preference"
+    )
+    content = Column(
+        Text,
+        nullable=False,
+        comment="The memory content (plain text summary)"
+    )
+    metadata_json = Column(
+        JSONB,
+        nullable=True,
+        default=dict,
+        comment="Extra metadata (session_id, act references, etc.)"
+    )
+    embedding = Column(
+        Vector(384) if PGVECTOR_AVAILABLE else Text,
+        nullable=True,
+        comment="384-dim embedding for semantic memory retrieval"
+    )
+    importance_score = Column(
+        Float,
+        nullable=True,
+        default=0.5,
+        comment="0.0-1.0 importance for memory ranking"
+    )
+    session_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("chat_sessions.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="Source session (if applicable)"
+    )
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+        index=True
+    )
+    expires_at = Column(
+        DateTime,
+        nullable=True,
+        comment="Optional TTL for temporary memories"
+    )
+    
+    # Relationship
+    user = relationship("User", backref="memories")
+    
+    # Indexes for efficient per-user memory retrieval
+    __table_args__ = (
+        Index('idx_user_memory_user_type', 'user_id', 'memory_type'),
+        Index('idx_user_memory_user_created', 'user_id', 'created_at'),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<UserMemory(user_id={self.user_id}, type={self.memory_type})>"
+
+
+# =============================================================================
 # Encrypted Data Storage Model
 # =============================================================================
 class EncryptedData(Base):

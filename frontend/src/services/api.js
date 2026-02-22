@@ -4,7 +4,7 @@
  */
 
 // Use environment variable in production, fallback to localhost for development
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
     (import.meta.env.PROD ? '' : 'http://localhost:8000');
 
 
@@ -20,26 +20,6 @@ function getAuthHeaders() {
         }
     }
     return {};
-}
-
-/**
- * Validate if the stored token is still valid
- * Returns false if token is expired or invalid
- */
-export async function validateToken(token) {
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-            },
-        });
-
-        return response.ok; // true if 200, false if 401
-    } catch (error) {
-        return false;
-    }
 }
 
 /**
@@ -292,7 +272,7 @@ export async function sendChatWithFile(query, fileContext, sessionId = null, doc
             document_content: fileContext,
             question: query,
         };
-
+        
         if (sessionId) {
             requestBody.session_id = sessionId;
         }
@@ -365,5 +345,162 @@ export default {
     getChatSessions,
     getChatSession,
     deleteChatSession,
-    validateToken,
+    getUserProfile,
+    updateUserProfile,
+    getUserStats,
+    getUserMemories,
+    clearUserMemories,
+    exportUserData,
+    deleteUserAccount,
 };
+
+
+// =============================================================================
+// Profile & Dashboard API
+// =============================================================================
+
+/**
+ * Get the authenticated user's profile
+ */
+export async function getUserProfile() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/profile`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        });
+        if (!response.ok) {
+            if (response.status === 401) return null;
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to fetch profile');
+        }
+        return await response.json();
+    } catch (error) {
+        if (error.name === 'TypeError') throw new Error('Unable to connect to server');
+        throw error;
+    }
+}
+
+/**
+ * Update user profile
+ */
+export async function updateUserProfile(data) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/profile`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+            body: JSON.stringify(data),
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to update profile');
+        }
+        return await response.json();
+    } catch (error) {
+        if (error.name === 'TypeError') throw new Error('Unable to connect to server');
+        throw error;
+    }
+}
+
+/**
+ * Get user dashboard stats
+ */
+export async function getUserStats() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/profile/stats`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        });
+        if (!response.ok) {
+            if (response.status === 401) return null;
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to fetch stats');
+        }
+        return await response.json();
+    } catch (error) {
+        if (error.name === 'TypeError') throw new Error('Unable to connect to server');
+        throw error;
+    }
+}
+
+/**
+ * Get user AI memories
+ */
+export async function getUserMemories(memoryType = null, limit = 20) {
+    try {
+        let url = `${API_BASE_URL}/api/v1/profile/memories?limit=${limit}`;
+        if (memoryType) url += `&memory_type=${memoryType}`;
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        });
+        if (!response.ok) {
+            if (response.status === 401) return null;
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to fetch memories');
+        }
+        return await response.json();
+    } catch (error) {
+        if (error.name === 'TypeError') throw new Error('Unable to connect to server');
+        throw error;
+    }
+}
+
+/**
+ * Clear all AI memories
+ */
+export async function clearUserMemories() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/profile/memories`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to clear memories');
+        }
+        return await response.json();
+    } catch (error) {
+        if (error.name === 'TypeError') throw new Error('Unable to connect to server');
+        throw error;
+    }
+}
+
+/**
+ * Export all user data (DPDPA / GDPR)
+ */
+export async function exportUserData() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/profile/export`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to export data');
+        }
+        return await response.json();
+    } catch (error) {
+        if (error.name === 'TypeError') throw new Error('Unable to connect to server');
+        throw error;
+    }
+}
+
+/**
+ * Permanently delete user account and all data
+ */
+export async function deleteUserAccount() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/profile/delete-account`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to delete account');
+        }
+        return await response.json();
+    } catch (error) {
+        if (error.name === 'TypeError') throw new Error('Unable to connect to server');
+        throw error;
+    }
+}

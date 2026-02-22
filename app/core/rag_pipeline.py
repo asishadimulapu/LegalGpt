@@ -11,15 +11,17 @@ Viva Explanation:
 """
 
 import time
+import uuid
 from typing import List, Optional, Tuple
 import logging
 
-# LLM provider imports are lazy-loaded inside get_llm() to avoid
-# crashes when unused provider packages have version conflicts
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnablePassthrough
+from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.vector_store import vector_store_manager, load_vector_store
@@ -27,7 +29,8 @@ from app.core.prompts import (
     RAG_SYSTEM_PROMPT, 
     RAG_QA_TEMPLATE, 
     FALLBACK_RESPONSE,
-    format_retrieved_context
+    format_retrieved_context,
+    MEMORY_AUGMENTED_QA_TEMPLATE,
 )
 from app.schemas.chat import LegalSource
 
@@ -50,7 +53,6 @@ def get_llm():
         if not settings.openai_api_key:
             raise ValueError("OPENAI_API_KEY is required")
         
-        from langchain_openai import ChatOpenAI
         return ChatOpenAI(
             api_key=settings.openai_api_key,
             model="gpt-4-turbo-preview",
@@ -63,7 +65,6 @@ def get_llm():
         if not settings.google_api_key:
             raise ValueError("GOOGLE_API_KEY is required")
         
-        from langchain_google_genai import ChatGoogleGenerativeAI
         return ChatGoogleGenerativeAI(
             google_api_key=settings.google_api_key,
             model="gemini-1.5-flash",
@@ -76,7 +77,6 @@ def get_llm():
         if not settings.openrouter_api_key:
             raise ValueError("OPENROUTER_API_KEY is required")
         
-        from langchain_openai import ChatOpenAI
         return ChatOpenAI(
             api_key=settings.openrouter_api_key,
             base_url="https://openrouter.ai/api/v1",
@@ -86,7 +86,7 @@ def get_llm():
             max_retries=2,
             default_headers={
                 "HTTP-Referer": settings.app_url,
-                "X-Title": settings.app_name
+                "X-Title": "Indian Law RAG Chatbot"
             }
         )
     
@@ -253,51 +253,76 @@ class RAGPipeline:
     def generate_response(
         self, 
         query: str, 
-        context: str
+        context: str,
+        memory_context: str = "",
+        chat_history: str = "",
+        user_profile_context: str = ""
     ) -> str:
         """
-        Generate response using LLM with retrieved context.
+        Generate response using LLM with retrieved context + user memory.
         
         Args:
             query: User's question
             context: Formatted context from retrieved documents
+            memory_context: Long-term memory relevant to query (per-user)
+            chat_history: Short-term session messages
+            user_profile_context: User profile details (location, interests)
             
         Returns:
             str: Generated response
             
         Viva Explanation:
         - Uses carefully crafted prompt with anti-hallucination rules
-        - LLM is constrained to use ONLY the provided context
-        - Returns fallback if no relevant information found
+        - Injects per-user memory for personalised answers
+        - LLM is constrained to use ONLY the provided legal context
+        - Memory provides conversational continuity, NOT legal facts
         """
-        # Create prompt template
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", RAG_SYSTEM_PROMPT),
-            ("human", RAG_QA_TEMPLATE)
-        ])
+        # Choose template based on whether memory is available
+        has_memory = bool(memory_context or chat_history or user_profile_context)
         
-        # Create chain
-        chain = prompt | self.llm | StrOutputParser()
-        
-        # Generate response
-        response = chain.invoke({
-            "context": context,
-            "question": query
-        })
+        if has_memory:
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", RAG_SYSTEM_PROMPT),
+                ("human", MEMORY_AUGMENTED_QA_TEMPLATE)
+            ])
+            chain = prompt | self.llm | StrOutputParser()
+            response = chain.invoke({
+                "context": context,
+                "question": query,
+                "memory_context": memory_context or "No previous memory.",
+                "chat_history": chat_history or "No prior conversation in this session.",
+                "user_profile": user_profile_context or "No profile information.",
+            })
+        else:
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", RAG_SYSTEM_PROMPT),
+                ("human", RAG_QA_TEMPLATE)
+            ])
+            chain = prompt | self.llm | StrOutputParser()
+            response = chain.invoke({
+                "context": context,
+                "question": query
+            })
         
         return response
     
     def query(
         self, 
         query: str, 
-        top_k: int = None
+        top_k: int = None,
+        db: Optional[Session] = None,
+        user_id: Optional[uuid.UUID] = None,
+        session_id: Optional[uuid.UUID] = None
     ) -> Tuple[str, List[LegalSource], bool, int]:
         """
-        Execute full RAG pipeline for a query.
+        Execute full RAG pipeline for a query with optional per-user memory.
         
         Args:
             query: User's legal question
             top_k: Number of documents to retrieve
+            db: Database session (needed for memory features)
+            user_id: Current user's ID (for memory isolation)
+            session_id: Current chat session ID (for short-term context)
             
         Returns:
             Tuple containing:
@@ -307,17 +332,15 @@ class RAGPipeline:
             - latency_ms (int): Response time in milliseconds
             
         Viva Explanation:
-        - Complete RAG workflow: retrieve -> format -> generate
+        - Complete RAG workflow: retrieve → format → inject memory → generate
+        - Memory is loaded per-user, never crosses user boundaries
         - Tracks latency for performance monitoring
-        - Returns structured response with citations
         """
         start_time = time.time()
         
         try:
             # Step 1: Retrieve relevant documents
-            retrieval_start = time.time()
             documents = self.retrieve(query, top_k)
-            retrieval_ms = int((time.time() - retrieval_start) * 1000)
             
             # Step 2: Check if any relevant documents found
             if not documents:
@@ -328,212 +351,49 @@ class RAGPipeline:
             # Step 3: Format context
             context = format_retrieved_context(documents)
             
-            # Step 4: Generate response (LLM - usually the slowest part!)
-            llm_start = time.time()
-            answer = self.generate_response(query, context)
-            llm_ms = int((time.time() - llm_start) * 1000)
+            # Step 4: Load per-user memory (if user is authenticated)
+            memory_context = ""
+            chat_history = ""
+            user_profile_context = ""
             
-            # Step 5: Format sources
+            if db and user_id:
+                try:
+                    from app.core.memory import (
+                        recall_relevant_memories,
+                        get_short_term_context,
+                        get_user_profile_context,
+                    )
+                    memory_context = recall_relevant_memories(db, user_id, query)
+                    user_profile_context = get_user_profile_context(db, user_id)
+                    if session_id:
+                        chat_history = get_short_term_context(db, session_id)
+                except Exception as e:
+                    logger.warning(f"Memory retrieval failed (non-fatal): {e}")
+            
+            # Step 5: Generate response (with memory if available)
+            answer = self.generate_response(
+                query, context,
+                memory_context=memory_context,
+                chat_history=chat_history,
+                user_profile_context=user_profile_context
+            )
+            
+            # Step 6: Format sources
             sources = self.format_sources(documents)
             
-            # Calculate total latency
+            # Calculate latency
             latency_ms = int((time.time() - start_time) * 1000)
             
             # Check if response is a fallback
             is_fallback = FALLBACK_RESPONSE.lower() in answer.lower()
             
-            # Detailed timing breakdown
-            logger.info(f"Query completed in {latency_ms}ms (retrieval={retrieval_ms}ms, LLM={llm_ms}ms)")
+            logger.info(f"Query completed in {latency_ms}ms (memory={'yes' if memory_context else 'no'})")
             
             return answer, sources, is_fallback, latency_ms
         
         except Exception as e:
             logger.error(f"RAG pipeline error: {e}")
             latency_ms = int((time.time() - start_time) * 1000)
-            raise
-
-    def generate_response_stream(
-        self, 
-        query: str, 
-        context: str
-    ):
-        """
-        Stream response using LLM with retrieved context (Synchronous).
-        """
-        # Create prompt template
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", RAG_SYSTEM_PROMPT),
-            ("human", RAG_QA_TEMPLATE)
-        ])
-        
-        # Create chain
-        chain = prompt | self.llm | StrOutputParser()
-        
-        # Stream response
-        for chunk in chain.stream({
-            "context": context,
-            "question": query
-        }):
-            yield chunk
-
-    async def agenerate_response_stream(
-        self, 
-        query: str, 
-        context: str
-    ):
-        """
-        Stream response using LLM with retrieved context (Asynchronous).
-        """
-        # Create prompt template
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", RAG_SYSTEM_PROMPT),
-            ("human", RAG_QA_TEMPLATE)
-        ])
-        
-        # Create chain
-        chain = prompt | self.llm | StrOutputParser()
-        
-        # Async stream response
-        async for chunk in chain.astream({
-            "context": context,
-            "question": query
-        }):
-            yield chunk
-
-    def query_stream(
-        self, 
-        query: str, 
-        top_k: int = None
-    ):
-        """
-        Execute full RAG pipeline with streaming response (Synchronous).
-        """
-        start_time = time.time()
-        
-        try:
-            # Step 1: Retrieve relevant documents
-            retrieval_start = time.time()
-            documents = self.retrieve(query, top_k)
-            retrieval_ms = int((time.time() - retrieval_start) * 1000)
-            
-            # Step 2: Check if any relevant documents found
-            if not documents:
-                logger.warning(f"No documents found for query: {query[:100]}")
-                latency_ms = int((time.time() - start_time) * 1000)
-                yield FALLBACK_RESPONSE
-                # Yield metadata as a special final chunk
-                import json
-                yield f"\n__METADATA__:{json.dumps({'sources': [], 'is_fallback': True, 'latency_ms': latency_ms})}"
-                return
-            
-            # Step 3: Format context
-            context = format_retrieved_context(documents)
-            
-            # Step 4: Stream response (LLM)
-            llm_start = time.time()
-            full_answer = ""
-            
-            # Yield chunks as they arrive
-            for chunk in self.generate_response_stream(query, context):
-                full_answer += chunk
-                yield chunk
-                
-            llm_ms = int((time.time() - llm_start) * 1000)
-            
-            # Step 5: Format sources
-            sources = self.format_sources(documents)
-            
-            # Calculate total latency
-            latency_ms = int((time.time() - start_time) * 1000)
-            
-            # Check if response is a fallback
-            is_fallback = FALLBACK_RESPONSE.lower() in full_answer.lower()
-            
-            # Detailed timing breakdown
-            logger.info(f"Stream query completed in {latency_ms}ms")
-            
-            # Yield metadata as a special final chunk
-            import json
-            sources_dict = [s.model_dump() for s in sources]
-            metadata = {
-                'sources': sources_dict,
-                'is_fallback': is_fallback,
-                'latency_ms': latency_ms,
-                'full_answer': full_answer 
-            }
-            yield f"\n__METADATA__:{json.dumps(metadata)}"
-        
-        except Exception as e:
-            logger.error(f"RAG streaming pipeline error: {e}")
-            raise
-
-    async def aquery_stream(
-        self, 
-        query: str, 
-        top_k: int = None
-    ):
-        """
-        Execute full RAG pipeline with streaming response (Asynchronous).
-        Uses run_in_threadpool for blocking retrieval to avoid blocking event loop.
-        """
-        from starlette.concurrency import run_in_threadpool
-        start_time = time.time()
-        
-        try:
-            # Step 1: Retrieve relevant documents (Blocking - run in thread)
-            retrieval_start = time.time()
-            documents = await run_in_threadpool(self.retrieve, query, top_k)
-            retrieval_ms = int((time.time() - retrieval_start) * 1000)
-            
-            # Step 2: Check if any relevant documents found
-            if not documents:
-                logger.warning(f"No documents found for query: {query[:100]}")
-                latency_ms = int((time.time() - start_time) * 1000)
-                yield FALLBACK_RESPONSE
-                # Yield metadata as a special final chunk
-                import json
-                yield f"\n__METADATA__:{json.dumps({'sources': [], 'is_fallback': True, 'latency_ms': latency_ms})}"
-                return
-            
-            # Step 3: Format context
-            context = format_retrieved_context(documents)
-            
-            # Step 4: Stream response (LLM - Async)
-            llm_start = time.time()
-            full_answer = ""
-            
-            # Yield chunks as they arrive
-            async for chunk in self.agenerate_response_stream(query, context):
-                full_answer += chunk
-                yield chunk
-                
-            llm_ms = int((time.time() - llm_start) * 1000)
-            
-            # Step 5: Format sources
-            sources = self.format_sources(documents)
-            
-            # Calculate total latency
-            latency_ms = int((time.time() - start_time) * 1000)
-            
-            # Check if response is a fallback
-            is_fallback = FALLBACK_RESPONSE.lower() in full_answer.lower()
-            
-            # Detailed timing breakdown
-            logger.info(f"Stream query completed in {latency_ms}ms")
-            
-            # Yield metadata as a special final chunk
-            import json
-            sources_dict = [s.model_dump() for s in sources]
-            metadata = {
-                'sources': sources_dict,
-                'is_fallback': is_fallback,
-                'latency_ms': latency_ms,
-                'full_answer': full_answer 
-            }
-            yield f"\n__METADATA__:{json.dumps(metadata)}"
-        
-        except Exception as e:
-            logger.error(f"RAG streaming pipeline error: {e}")
             raise
     
     def is_ready(self) -> bool:

@@ -98,6 +98,29 @@ jobs:
             docker-compose.yml \
             ${{ secrets.VM_USERNAME }}@${{ secrets.VM_HOST }}:${{ env.VM_PROJECT_DIR }}/docker-compose.yml
 
+      - name: Ensure .env has production OAuth settings
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ${{ secrets.VM_USERNAME }}@${{ secrets.VM_HOST }} << 'ENV_SCRIPT'
+          cd /home/azureuser/nyayasahay
+
+          # Ensure GOOGLE_REDIRECT_URI is HTTPS in the .env
+          if grep -q 'GOOGLE_REDIRECT_URI=' .env 2>/dev/null; then
+            sed -i 's|GOOGLE_REDIRECT_URI=http://.*|GOOGLE_REDIRECT_URI=https://law-gpt.app/auth/callback|' .env
+          else
+            echo 'GOOGLE_REDIRECT_URI=https://law-gpt.app/auth/callback' >> .env
+          fi
+
+          # Ensure APP_URL is HTTPS
+          if grep -q 'APP_URL=' .env 2>/dev/null; then
+            sed -i 's|APP_URL=http://localhost.*|APP_URL=https://law-gpt.app|' .env
+          else
+            echo 'APP_URL=https://law-gpt.app' >> .env
+          fi
+
+          echo "✓ .env production values verified"
+          ENV_SCRIPT
+
       - name: Deploy to VM
         run: |
           ssh -v -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \

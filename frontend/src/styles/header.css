@@ -1,7 +1,10 @@
 /**
- * Header Styles - NyayaSahay Design
+ * Header Styles — Auth-Aware SaaS Navigation
+ * Logged OUT: marketing nav + Sign In / Get Started
+ * Logged IN:  workspace nav + truncated email + Logout
  */
 
+/* ── Base ─────────────────────────────────────────────────── */
 .header {
     position: fixed;
     top: 0;
@@ -10,29 +13,32 @@
     background: var(--light-surface);
     border-bottom: 1px solid var(--border-color);
     z-index: 1000;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .header-container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 0 var(--spacing-lg);
-    height: 70px;
+    height: 64px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: var(--spacing-lg);
 }
 
-/* Logo */
+/* ── Logo ─────────────────────────────────────────────────── */
 .logo {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
     text-decoration: none;
+    flex-shrink: 0;
 }
 
 .logo-icon {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     background: var(--primary);
     border-radius: var(--radius-md);
     display: flex;
@@ -42,30 +48,36 @@
 }
 
 .logo-text {
-    font-size: 1.25rem;
+    font-size: 1.2rem;
     font-weight: 700;
     color: var(--dark-surface);
+    letter-spacing: -0.01em;
 }
 
-/* Navigation */
+/* ── Navigation (center) ──────────────────────────────────── */
 .nav {
     display: flex;
     align-items: center;
-    gap: var(--spacing-xl);
+    gap: var(--spacing-lg);
+    margin-left: auto;
 }
 
 .nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     color: var(--text-muted);
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 500;
     text-decoration: none;
     transition: color 0.2s;
     position: relative;
+    white-space: nowrap;
 }
 
 .nav-link:hover,
 .nav-link.active {
-    color: var(--text-dark);
+    color: var(--primary);
 }
 
 .nav-link.active::after {
@@ -79,46 +91,65 @@
     border-radius: 1px;
 }
 
-/* Auth Buttons */
-.auth-buttons {
+/* ── Right-side Actions ───────────────────────────────────── */
+.header-actions {
     display: flex;
     align-items: center;
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
+    margin-left: auto;
+    flex-shrink: 0;
 }
 
+/* ── User email chip (logged in) ──────────────────────────── */
 .user-email {
     display: flex;
     align-items: center;
-    gap: var(--spacing-xs);
+    gap: 6px;
+    padding: 6px 14px;
+    background: var(--light-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-full);
     color: var(--text-muted);
-    font-size: 0.9rem;
+    font-size: 0.82rem;
+    max-width: 180px;
 }
 
+.email-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Buttons ──────────────────────────────────────────────── */
 .btn-signin {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    padding: 10px 20px;
+    padding: 8px 18px;
     background: transparent;
-    border: none;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
     color: var(--text-dark);
-    font-size: 0.95rem;
+    font-size: 0.88rem;
     font-weight: 600;
     cursor: pointer;
-    transition: color 0.2s;
+    transition: all 0.2s;
 }
 
 .btn-signin:hover {
+    border-color: var(--primary);
     color: var(--primary);
 }
 
+.btn-signin:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
 .btn-getstarted {
-    padding: 10px 24px;
+    padding: 8px 20px;
     background: var(--primary);
     border: none;
     border-radius: var(--radius-md);
     color: white;
-    font-size: 0.95rem;
+    font-size: 0.88rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
@@ -129,29 +160,38 @@
     transform: translateY(-1px);
 }
 
-.btn-chat {
+.btn-getstarted:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.btn-logout {
     display: flex;
     align-items: center;
-    gap: var(--spacing-xs);
-    padding: 10px 20px;
-    background: linear-gradient(135deg, var(--primary) 0%, #0d9488 100%);
-    border: none;
+    gap: 5px;
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    color: white;
-    font-size: 0.95rem;
-    font-weight: 600;
-    text-decoration: none;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
-    box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3);
 }
 
-.btn-chat:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.4);
+.btn-logout:hover {
+    border-color: #ef4444;
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.06);
 }
 
-/* Mobile Menu Toggle */
+.btn-logout:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+/* ── Mobile Toggle ────────────────────────────────────────── */
 .mobile-menu-toggle {
     display: none;
     background: none;
@@ -161,9 +201,33 @@
     padding: var(--spacing-sm);
 }
 
-/* Responsive */
+/* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 968px) {
     .nav {
+        position: fixed;
+        top: 64px;
+        left: 0;
+        right: 0;
+        background: var(--light-surface);
+        border-bottom: 1px solid var(--border-color);
+        flex-direction: column;
+        padding: var(--spacing-md) 0;
+        gap: 0;
+        display: none;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    .nav.open {
+        display: flex;
+    }
+
+    .nav-link {
+        padding: var(--spacing-sm) var(--spacing-lg);
+        width: 100%;
+        font-size: 0.95rem;
+    }
+
+    .nav-link.active::after {
         display: none;
     }
 
@@ -172,19 +236,16 @@
     }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
     .header-container {
         padding: 0 var(--spacing-md);
-    }
-
-    .logo-text {
-        font-size: 1.1rem;
     }
 
     .user-email {
         display: none;
     }
 
+    .btn-logout span,
     .btn-signin span {
         display: none;
     }

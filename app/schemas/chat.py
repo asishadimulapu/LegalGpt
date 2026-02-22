@@ -43,7 +43,8 @@ class ChatRequest(BaseModel):
     Example:
         {
             "query": "What is Article 21 of the Constitution?",
-            "session_id": "optional-uuid"
+            "session_id": "optional-uuid",
+            "language": "hi"
         }
     """
     query: str = Field(
@@ -55,6 +56,12 @@ class ChatRequest(BaseModel):
     session_id: Optional[UUID] = Field(
         None, 
         description="Optional session ID to continue conversation"
+    )
+    language: Optional[str] = Field(
+        None,
+        min_length=2,
+        max_length=10,
+        description="ISO 639-1 language code (e.g., 'hi', 'ta'). Auto-detected if omitted."
     )
 
 

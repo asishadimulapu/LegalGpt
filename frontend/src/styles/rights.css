@@ -1,0 +1,426 @@
+/**
+ * Rights Page Styles — Legal Knowledge Hub
+ */
+
+.rights-page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: var(--spacing-xl) var(--spacing-lg);
+}
+
+/* ── Header ────────────────────────────────────────── */
+.rights-header {
+  margin-bottom: var(--spacing-xl);
+}
+
+.rights-header h1 {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 1.6rem;
+  color: var(--text-dark);
+  margin-bottom: var(--spacing-sm);
+}
+
+.rights-header p {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  max-width: 640px;
+}
+
+/* ── Tabs ──────────────────────────────────────────── */
+.rights-tabs {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xl);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: var(--spacing-sm);
+}
+
+.rights-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border: none;
+  background: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  transition: color 0.2s, background-color 0.2s, box-shadow 0.2s;
+  position: relative;
+  font-family: inherit;
+}
+
+.rights-tab:hover {
+  color: var(--text-dark);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.rights-tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+  color: var(--text-dark);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.rights-tab.active {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.rights-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -9px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary);
+  border-radius: 1px;
+}
+
+/* ── Content ───────────────────────────────────────── */
+.rights-content {
+  min-height: 400px;
+}
+
+/* ── Fundamental Rights Grid ───────────────────────── */
+.rights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.right-card {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.right-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 16px rgba(38, 184, 184, 0.08);
+}
+
+.right-card-icon {
+  width: 44px;
+  height: 44px;
+  background: rgba(38, 184, 184, 0.1);
+  color: var(--primary);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.right-card-body {
+  flex: 1;
+}
+
+.right-article {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--primary);
+  margin-bottom: 4px;
+  display: block;
+}
+
+.right-card-body h3 {
+  font-size: 1.05rem;
+  margin-bottom: 6px;
+  color: var(--text-dark);
+}
+
+.right-card-body p {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.right-ask-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(38, 184, 184, 0.08);
+  color: var(--primary);
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.2s;
+  width: fit-content;
+}
+
+.right-ask-btn:hover {
+  background: rgba(38, 184, 184, 0.15);
+}
+
+/* ── Quick Guides Grid ─────────────────────────────── */
+.guides-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.guide-card {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.guide-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--text-dark);
+}
+
+.guide-header h3 {
+  font-size: 1rem;
+}
+
+.guide-points {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.guide-points li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.guide-points li svg {
+  color: var(--primary);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.guide-ask-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(38, 184, 184, 0.08);
+  color: var(--primary);
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.2s;
+  width: fit-content;
+  margin-top: auto;
+}
+
+.guide-ask-btn:hover {
+  background: rgba(38, 184, 184, 0.15);
+}
+
+/* ── IPC Sections ──────────────────────────────────── */
+.ipc-search {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 12px 16px;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.ipc-search svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.ipc-search input {
+  flex: 1;
+  border: none;
+  background: none;
+  font-size: 0.95rem;
+  color: var(--text-dark);
+  outline: none;
+  font-family: inherit;
+}
+
+.ipc-search input:focus-visible {
+  outline: none;
+}
+
+.ipc-search:focus-within {
+  box-shadow: 0 0 0 2px var(--primary);
+}
+
+.ipc-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.ipc-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  transition: border-color 0.2s;
+}
+
+.ipc-item:hover {
+  border-color: var(--primary);
+}
+
+.ipc-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+}
+
+.ipc-section {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-dark);
+  min-width: 100px;
+}
+
+.ipc-title {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.ipc-category {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent-blue);
+  border-radius: var(--radius-full);
+  font-weight: 500;
+}
+
+.ipc-ask-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: rgba(38, 184, 184, 0.08);
+  color: var(--primary);
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.ipc-ask-btn:hover {
+  background: rgba(38, 184, 184, 0.15);
+}
+
+.ipc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xl);
+  color: var(--text-muted);
+}
+
+/* ── CTA Banner ────────────────────────────────────── */
+.rights-cta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: var(--radius-md);
+  margin-top: var(--spacing-xl);
+}
+
+.rights-cta svg {
+  color: var(--accent-orange);
+  flex-shrink: 0;
+}
+
+.rights-cta p {
+  flex: 1;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.rights-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  background: var(--primary);
+  color: white;
+  border-radius: var(--radius-md);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+
+.rights-cta-btn:hover {
+  background: var(--primary-dark);
+}
+
+.rights-cta-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  background: var(--primary-dark);
+}
+
+/* ── Responsive ────────────────────────────────────── */
+@media (max-width: 640px) {
+  .rights-page {
+    padding: var(--spacing-lg) var(--spacing-md);
+  }
+
+  .rights-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .rights-grid,
+  .guides-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ipc-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .rights-cta {
+    flex-direction: column;
+    text-align: center;
+  }
+}

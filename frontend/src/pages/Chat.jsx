@@ -4,13 +4,11 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
     Scale,
     Plus,
     Send,
-    Home,
-    Info,
     MessageSquare,
     AlertCircle,
     Loader2,
@@ -18,8 +16,6 @@ import {
     FileText,
     X,
     Upload,
-    LogOut,
-    User,
     Clock,
     Trash2
 } from 'lucide-react';
@@ -44,7 +40,7 @@ const EXAMPLE_QUERIES = [
 
 const ALLOWED_FILE_TYPES = ['.pdf', '.txt', '.doc', '.docx'];
 
-function Chat({ user, onLogout }) {
+function Chat({ user, onLogout, onAuthClick }) {
     const navigate = useNavigate();
     const [messages, setMessages] = useState([]);
     const [inputValue, setInputValue] = useState('');
@@ -236,145 +232,54 @@ function Chat({ user, onLogout }) {
         setIsLoading(true);
 
         try {
-            // Create placeholder bot message
-            const botMessageId = Date.now() + 1;
+            let response;
+
+            if (fileContent) {
+                // Pass filename for chat history context
+                response = await sendChatWithFile(query, fileContent, sessionId, uploadedFile?.name);
+            } else {
+                response = await sendChatMessage(query, sessionId);
+            }
+
+            if (response.session_id) {
+                setSessionId(response.session_id);
+                setActiveSessionId(response.session_id);
+                // Reload sessions to show new one
+                if (user) {
+                    loadSessions();
+                }
+            }
+
             const botMessage = {
-                id: botMessageId,
+                id: Date.now() + 1,
                 role: 'bot',
-                content: '',
-                sources: [],
-                isFallback: false,
-                latency: 0,
+                content: response.answer,
+                sources: response.sources || [],
+                isFallback: response.is_fallback || false,
+                latency: response.latency_ms,
                 timestamp: getTimestamp(),
                 basedOnFile: !!fileContent,
             };
             setMessages(prev => [...prev, botMessage]);
 
             if (fileContent) {
-                // File upload chat doesn't support streaming yet
-                // Pass filename for chat history context
-                const response = await sendChatWithFile(query, fileContent, sessionId, uploadedFile?.name);
-
-                if (response.session_id) {
-                    setSessionId(response.session_id);
-                    setActiveSessionId(response.session_id);
-                    if (user) loadSessions();
-                }
-
-                setMessages(prev => prev.map(msg =>
-                    msg.id === botMessageId
-                        ? {
-                            ...msg,
-                            content: response.answer,
-                            sources: response.sources || [],
-                            isFallback: response.is_fallback,
-                            latency: response.latency_ms
-                        }
-                        : msg
-                ));
-
                 setUploadedFile(null);
                 setFileContent(null);
-                setIsLoading(false);
-                return;
-            }
-
-            // Streaming chat
-            const token = localStorage.getItem('token');
-            const headers = {
-                'Content-Type': 'application/json',
-            };
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
-
-            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'}/chat/stream`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({
-                    query,
-                    session_id: sessionId
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`Server error: ${response.statusText}`);
-            }
-
-            if (!response.body) {
-                throw new Error('ReadableStream not supported in this browser.');
-            }
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let accumulatedContent = '';
-
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n\n');
-
-                for (const line of lines) {
-                    if (line.startsWith('event: session')) {
-                        const data = line.split('data: ')[1];
-                        if (data && (!sessionId || sessionId !== data)) {
-                            setSessionId(data);
-                            setActiveSessionId(data);
-                            if (user) loadSessions(); // Refresh list to show new session
-                        }
-                    } else if (line.startsWith('event: sources')) {
-                        const data = line.split('data: ')[1];
-                        if (data) {
-                            try {
-                                const sources = JSON.parse(data);
-                                setMessages(prev => prev.map(msg =>
-                                    msg.id === botMessageId ? { ...msg, sources } : msg
-                                ));
-                            } catch (e) {
-                                console.error('Error parsing sources:', e);
-                            }
-                        }
-                    } else if (line.startsWith('event: error')) {
-                        const data = line.split('data: ')[1];
-                        throw new Error(JSON.parse(data));
-                    } else if (line.startsWith('data: ')) {
-                        try {
-                            const data = line.substring(6); // Remove "data: "
-                            const text = JSON.parse(data);
-                            accumulatedContent += text;
-
-                            setMessages(prev => prev.map(msg =>
-                                msg.id === botMessageId ? { ...msg, content: accumulatedContent } : msg
-                            ));
-                        } catch (e) {
-                            // Ignore incomplete JSON chunks or keep-alives
-                        }
-                    }
-                }
             }
 
         } catch (err) {
             const errorMsg = typeof err === 'string'
                 ? err
                 : (err?.message || err?.detail || JSON.stringify(err) || 'An unexpected error occurred');
-
-            setMessages(prev => prev.map(msg => {
-                if (msg.role === 'bot' && msg.content === '') {
-                    return {
-                        ...msg,
-                        content: `I apologize, but I encountered an error: ${errorMsg}. Please try again.`,
-                        isFallback: true
-                    };
-                }
-                return msg;
-            }));
-
-            // If strictly new error message needed:
-            if (!messages.some(m => m.content && m.content.includes(errorMsg))) {
-                setError(errorMsg);
-            }
+            const errorMessage = {
+                id: Date.now() + 1,
+                role: 'bot',
+                content: `I apologize, but I encountered an error: ${errorMsg}. Please try again.`,
+                isFallback: true,
+                timestamp: getTimestamp(),
+            };
+            setMessages(prev => [...prev, errorMessage]);
+            setError(errorMsg);
         } finally {
             setIsLoading(false);
             inputRef.current?.focus();
@@ -403,13 +308,6 @@ function Chat({ user, onLogout }) {
         setUploadError(null);
     };
 
-    const handleLogout = () => {
-        if (onLogout) {
-            onLogout();
-        }
-        navigate('/');
-    };
-
     const formatFileSize = (bytes) => {
         if (bytes < 1024) return bytes + ' B';
         if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -426,24 +324,14 @@ function Chat({ user, onLogout }) {
     }
 
     return (
-        <div className="chat-page">
-            {/* Sidebar */}
-            <aside className="chat-sidebar">
-                <div className="sidebar-header">
-                    <Link to="/" className="sidebar-logo">
-                        <span className="sidebar-logo-icon">
-                            <Scale size={22} />
-                        </span>
-                        <span className="sidebar-logo-text">NyayaSahay</span>
-                    </Link>
-                </div>
+        <div className={`chat-page ${!user ? 'guest-mode' : ''}`}>
+            {/* Sidebar — only for signed-in users */}
+            {user && (
+                <aside className="chat-sidebar">
+                    <button className="new-chat-btn" onClick={handleNewChat}>
+                        <Plus size={18} /> New Chat
+                    </button>
 
-                <button className="new-chat-btn" onClick={handleNewChat}>
-                    <Plus size={18} /> New Chat
-                </button>
-
-                {/* Chat History */}
-                {user && (
                     <div className="sidebar-section">
                         <h4>
                             <Clock size={14} /> Chat History
@@ -479,65 +367,25 @@ function Chat({ user, onLogout }) {
                             <p className="no-sessions">No chat history yet</p>
                         )}
                     </div>
-                )}
-
-                {/* Quick Questions */}
-                {!user && (
-                    <div className="sidebar-section">
-                        <h4>Quick Questions</h4>
-                        <div className="quick-questions">
-                            {EXAMPLE_QUERIES.map((query, index) => (
-                                <button
-                                    key={index}
-                                    className="quick-question-btn"
-                                    onClick={() => handleExampleClick(query)}
-                                >
-                                    <MessageSquare size={14} /> {query}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                <div className="sidebar-footer">
-                    <div className="sidebar-footer-links">
-                        <Link to="/about" className="sidebar-link">
-                            <Info size={16} /> About
-                        </Link>
-                        <Link to="/" className="sidebar-link">
-                            <Home size={16} /> Home
-                        </Link>
-                    </div>
-
-                    {/* Unified Account Section */}
-                    {user ? (
-                        <div className="account-card">
-                            <div className="account-info">
-                                <div className="account-avatar">
-                                    <User size={20} />
-                                </div>
-                                <div className="account-details">
-                                    <span className="account-email">{user.email}</span>
-                                    <span className="account-status">Logged in</span>
-                                </div>
-                            </div>
-                            <button className="logout-btn" onClick={handleLogout}>
-                                <LogOut size={16} /> Logout
-                            </button>
-                        </div>
-                    ) : (
-                        <Link to="/" className="login-card">
-                            <div className="login-avatar">
-                                <User size={18} />
-                            </div>
-                            <span>Login / Register</span>
-                        </Link>
-                    )}
-                </div>
-            </aside>
+                </aside>
+            )}
 
             {/* Main Chat Area */}
             <main className="chat-main">
+                {/* Guest Header — replaces the app Header for unauthenticated chat */}
+                {!user && (
+                    <header className="guest-chat-header">
+                        <a href="/" className="guest-chat-brand">
+                            <Scale size={22} />
+                            <span>NyayaSahay</span>
+                        </a>
+                        <div className="guest-chat-actions">
+                            <button className="guest-signin-btn" onClick={() => onAuthClick?.('signin')}>Sign In</button>
+                            <button className="guest-signup-btn" onClick={() => onAuthClick?.('register')}>Get Started</button>
+                        </div>
+                    </header>
+                )}
+
                 {/* Chat Header */}
                 <header className="chat-top-header">
                     <div className="chat-header-info">

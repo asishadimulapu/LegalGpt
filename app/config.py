@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     app_env: Literal["development", "staging", "production"] = "production"  # Default to production for safety
     app_name: str = "Indian Law RAG Chatbot"
     app_version: str = "1.0.0"
-    app_url: str = "http://localhost:8000"  # Base URL for the application
+    app_url: str = "https://law-gpt.app"  # Base URL for the application
     debug: bool = False  # Default to False for production
     log_level: str = "INFO"
     
@@ -85,7 +85,7 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     google_client_id: str = ""  # Set in .env
     google_client_secret: str = ""  # Set in .env
-    google_redirect_uri: str = "http://localhost:5173/auth/callback"
+    google_redirect_uri: str = "https://law-gpt.app/auth/callback"
     
     # -------------------------------------------------------------------------
     # Encryption Configuration

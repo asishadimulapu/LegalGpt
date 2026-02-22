@@ -17,7 +17,7 @@ from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy import desc
 import logging
 
-from app.db.models import User, ChatSession, ChatMessage, QueryLog, MessageRole
+from app.db.models import User, ChatSession, ChatMessage, QueryLog, MessageRole, UserProfile, UserMemory
 from app.schemas.user import UserCreate
 from app.utils.auth import get_password_hash, verify_password
 
@@ -474,3 +474,201 @@ class QueryLogCRUD:
             .scalar()
         )
         return float(result) if result else 0.0
+
+
+# =============================================================================
+# User Profile CRUD Operations
+# =============================================================================
+class UserProfileCRUD:
+    """CRUD operations for per-user profile/preferences."""
+    
+    @staticmethod
+    def get_or_create(db: Session, user_id: uuid.UUID) -> UserProfile:
+        """Get existing profile or create a blank one."""
+        try:
+            profile = db.query(UserProfile).filter(
+                UserProfile.user_id == user_id
+            ).first()
+            if not profile:
+                profile = UserProfile(user_id=user_id)
+                db.add(profile)
+                db.flush()
+                db.refresh(profile)
+                db.commit()
+                logger.info(f"Created user profile for user_id={user_id}")
+            return profile
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"UserProfile get_or_create failed: {e}")
+            raise
+    
+    @staticmethod
+    def update(
+        db: Session,
+        user_id: uuid.UUID,
+        location: Optional[str] = None,
+        preferred_language: Optional[str] = None,
+        case_types: Optional[List[str]] = None,
+        legal_interests: Optional[List[str]] = None,
+        extra_context: Optional[dict] = None
+    ) -> UserProfile:
+        """Update user profile fields (merge, not overwrite lists)."""
+        try:
+            profile = UserProfileCRUD.get_or_create(db, user_id)
+            if location is not None:
+                profile.location = location
+            if preferred_language is not None:
+                profile.preferred_language = preferred_language
+            if case_types is not None:
+                existing = profile.case_types or []
+                profile.case_types = list(set(existing + case_types))
+            if legal_interests is not None:
+                existing = profile.legal_interests or []
+                profile.legal_interests = list(set(existing + legal_interests))
+            if extra_context is not None:
+                existing = profile.extra_context or {}
+                existing.update(extra_context)
+                profile.extra_context = existing
+            db.flush()
+            db.commit()
+            db.refresh(profile)
+            return profile
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"UserProfile update failed: {e}")
+            raise
+
+
+# =============================================================================
+# User Memory CRUD Operations
+# =============================================================================
+class UserMemoryCRUD:
+    """
+    CRUD operations for per-user long-term memory.
+    All queries are ALWAYS scoped by user_id to prevent cross-user leakage.
+    """
+    
+    @staticmethod
+    def create(
+        db: Session,
+        user_id: uuid.UUID,
+        memory_type: str,
+        content: str,
+        metadata_json: Optional[dict] = None,
+        embedding: Optional[list] = None,
+        importance_score: float = 0.5,
+        session_id: Optional[uuid.UUID] = None,
+        expires_at: Optional[datetime] = None
+    ) -> UserMemory:
+        """Store a new memory entry for a user."""
+        memory = UserMemory(
+            user_id=user_id,
+            memory_type=memory_type,
+            content=content,
+            metadata_json=metadata_json or {},
+            embedding=embedding,
+            importance_score=importance_score,
+            session_id=session_id,
+            expires_at=expires_at
+        )
+        try:
+            db.add(memory)
+            db.flush()
+            db.refresh(memory)
+            db.commit()
+            logger.info(f"Created memory [{memory_type}] for user_id={user_id}")
+            return memory
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"UserMemory create failed: {e}")
+            raise
+    
+    @staticmethod
+    def get_user_memories(
+        db: Session,
+        user_id: uuid.UUID,
+        memory_type: Optional[str] = None,
+        limit: int = 20
+    ) -> List[UserMemory]:
+        """
+        Retrieve memories for a specific user.
+        Always filtered by user_id — no cross-user access possible.
+        """
+        query = db.query(UserMemory).filter(UserMemory.user_id == user_id)
+        if memory_type:
+            query = query.filter(UserMemory.memory_type == memory_type)
+        return (
+            query.order_by(desc(UserMemory.importance_score), desc(UserMemory.created_at))
+            .limit(limit)
+            .all()
+        )
+    
+    @staticmethod
+    def get_recent_summaries(
+        db: Session,
+        user_id: uuid.UUID,
+        limit: int = 5
+    ) -> List[UserMemory]:
+        """Get the most recent conversation summaries for a user."""
+        return (
+            db.query(UserMemory)
+            .filter(UserMemory.user_id == user_id)
+            .filter(UserMemory.memory_type == "conversation_summary")
+            .order_by(desc(UserMemory.created_at))
+            .limit(limit)
+            .all()
+        )
+    
+    @staticmethod
+    def search_memories_text(
+        db: Session,
+        user_id: uuid.UUID,
+        search_text: str,
+        limit: int = 5
+    ) -> List[UserMemory]:
+        """
+        Simple text-based memory search (fallback when pgvector unavailable).
+        Uses PostgreSQL ILIKE for case-insensitive substring matching.
+        """
+        return (
+            db.query(UserMemory)
+            .filter(UserMemory.user_id == user_id)
+            .filter(UserMemory.content.ilike(
+                "%" + search_text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%",
+                escape="\\"
+            ))
+            .order_by(desc(UserMemory.importance_score))
+            .limit(limit)
+            .all()
+        )
+    
+    @staticmethod
+    def delete_user_memories(db: Session, user_id: uuid.UUID) -> int:
+        """Delete ALL memories for a user (right to erasure)."""
+        try:
+            count = db.query(UserMemory).filter(
+                UserMemory.user_id == user_id
+            ).delete()
+            db.commit()
+            logger.info(f"Deleted {count} memories for user_id={user_id}")
+            return count
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"Failed to delete user memories: {e}")
+            raise
+    
+    @staticmethod
+    def cleanup_expired(db: Session) -> int:
+        """Remove expired memory entries."""
+        try:
+            count = db.query(UserMemory).filter(
+                UserMemory.expires_at.isnot(None),
+                UserMemory.expires_at < datetime.utcnow()
+            ).delete()
+            db.commit()
+            logger.info(f"Cleaned up {count} expired memories")
+            return count
+        except SQLAlchemyError as e:
+            db.rollback()
+            logger.error(f"Expired memory cleanup failed: {e}")
+            raise
