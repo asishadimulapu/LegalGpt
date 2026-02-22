@@ -72,3 +72,10 @@ frontend/dist/
 tmp/
 temp/
 *.tmp
+
+# VS Code extensions
+.kluster/
+.agent/
+
+# Generated data (rebuild with scripts)
+data/faiss_index/
