@@ -228,7 +228,6 @@ def _cache_key(text: str, src: str, tgt: str) -> str:
 
 def _cache_put(key: str, value: str):
     """Put a value in the translation cache with LRU eviction."""
-    global _translation_cache
     if len(_translation_cache) >= _CACHE_MAX:
         # Remove oldest 25%
         keys_to_remove = list(_translation_cache.keys())[:_CACHE_MAX // 4]
