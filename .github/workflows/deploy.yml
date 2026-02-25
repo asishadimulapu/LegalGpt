@@ -123,7 +123,7 @@ jobs:
 
       - name: Deploy to VM
         run: |
-          ssh -v -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ secrets.VM_USERNAME }}@${{ secrets.VM_HOST }} << 'DEPLOY_SCRIPT'
           
           echo "=========================================="

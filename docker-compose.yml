@@ -73,8 +73,7 @@ services:
     image: redis:7-alpine
     container_name: nyayasahay-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    # No ports exposed — Redis is only accessible within nyayasahay-net
     volumes:
       - redis-data:/data
     networks:

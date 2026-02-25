@@ -178,14 +178,15 @@ if "*" not in cors_origins:
     cors_origins = list(set(cors_origins + [
         "https://law-gpt.app",
     ]))
-    # Also allow localhost for development
-    if settings.is_development:
-        cors_origins.extend([
-            "http://localhost:5173",
-            "http://localhost:5174",
-            "http://127.0.0.1:5173",
-            "http://127.0.0.1:5174",
-        ])
+    # Always allow localhost for local development/testing
+    # (localhost origins cannot be spoofed from the internet, so this is safe)
+    cors_origins.extend([
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://localhost:8000",
+    ])
 
 app.add_middleware(
     CORSMiddleware,

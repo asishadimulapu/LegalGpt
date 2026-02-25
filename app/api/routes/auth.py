@@ -677,7 +677,7 @@ async def google_oauth_callback(
             # Generate short-lived transfer code
             # We don't want to expose the JWT in the URL
             transfer_code = secrets.token_urlsafe(16)
-            _store_temp_auth_code(transfer_code, {
+            await _store_temp_auth_code(transfer_code, {
                 "access_token": access_token,
                 "user": UserResponse(
                     id=user.id,

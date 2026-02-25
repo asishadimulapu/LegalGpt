@@ -427,5 +427,5 @@ async def analyze_document(
         logger.exception(f"Hybrid document analysis error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error analyzing document: {str(e)}"
+            detail="An error occurred analyzing the document. Please try again."
         ) from e

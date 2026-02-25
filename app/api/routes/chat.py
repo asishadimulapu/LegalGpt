@@ -191,7 +191,7 @@ async def chat(
         
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing query: {str(e)}"
+            detail="An error occurred processing your query. Please try again."
         )
 
 
