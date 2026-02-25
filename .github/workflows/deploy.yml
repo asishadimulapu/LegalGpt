@@ -11,7 +11,7 @@ on:
   workflow_dispatch: # Allow manual trigger
 
 env:
-  VM_PROJECT_DIR: /home/azureuser/nyayasahay
+  VM_PROJECT_DIR: /home/azureuser/LegalGpt
   REGISTRY: ghcr.io
   BACKEND_IMAGE: ghcr.io/asishadimulapu/legalgpt/backend
   FRONTEND_IMAGE: ghcr.io/asishadimulapu/legalgpt/frontend
@@ -102,7 +102,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ secrets.VM_USERNAME }}@${{ secrets.VM_HOST }} << 'ENV_SCRIPT'
-          cd /home/azureuser/nyayasahay
+          cd /home/azureuser/LegalGpt
 
           # Ensure GOOGLE_REDIRECT_URI is HTTPS in the .env
           if grep -q 'GOOGLE_REDIRECT_URI=' .env 2>/dev/null; then
@@ -130,7 +130,7 @@ jobs:
           echo "🚀 Starting Docker deployment at $(date)"
           echo "=========================================="
 
-          cd /home/azureuser/nyayasahay
+          cd /home/azureuser/LegalGpt
 
           # 1. Login to GitHub Container Registry
           echo "🔑 Logging in to ghcr.io..."
