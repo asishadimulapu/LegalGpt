@@ -13,14 +13,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nyayasahay.mobile"
+      "bundleIdentifier": "app.lawgpt.mobile"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1a1f2e"
       },
-      "package": "com.nyayasahay.mobile"
+      "package": "app.law_gpt.mobile"
     },
     "web": {
       "bundler": "metro",
@@ -34,7 +34,7 @@
       "expo-asset",
       "expo-sqlite"
     ],
-    "scheme": "nyayasahay",
+    "scheme": "law-gpt",
     "experiments": {
       "typedRoutes": true
     },

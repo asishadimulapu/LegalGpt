@@ -17,7 +17,6 @@ import {
     Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { useDrawerStatus } from '@react-navigation/drawer';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
@@ -165,9 +164,9 @@ export default function ChatScreen() {
         setIsLoading(true);
         scrollToBottom();
 
+        const botMessageId = Date.now() + 1;
         try {
             // Create placeholder bot message
-            const botMessageId = Date.now() + 1;
             const botMessage = {
                 id: botMessageId,
                 role: 'bot',
@@ -230,14 +229,13 @@ export default function ChatScreen() {
             ));
 
         } catch (err) {
-            const errorMessage = {
-                id: Date.now() + 1,
+            setMessages(prev => prev.filter(msg => msg.id !== botMessageId).concat({
+                id: Date.now() + 2,
                 role: 'bot',
                 content: `I apologize, but I encountered an error: ${err.message}. Please try again.`,
                 isFallback: true,
                 timestamp: getTimestamp(),
-            };
-            setMessages(prev => [...prev, errorMessage]);
+            }));
         } finally {
             setIsLoading(false);
             scrollToBottom();

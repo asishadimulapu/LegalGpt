@@ -9,10 +9,8 @@ import {
     View,
     Text,
     StyleSheet,
-    Dimensions,
     Pressable,
     FlatList,
-    Animated,
     useWindowDimensions,
     ActivityIndicator,
 } from 'react-native';

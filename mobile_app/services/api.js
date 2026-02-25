@@ -370,7 +370,7 @@ export async function analyzeDocument(documentContent, question, sessionId = nul
  * @param {string} code - The transfer code from the deep link
  * @returns {Promise<Object>} The access token and user data
  */
-async function exchangeTransferCode(code) {
+export async function exchangeTransferCode(code) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
@@ -399,6 +399,163 @@ async function exchangeTransferCode(code) {
     }
 }
 
+// =============================================================================
+// Profile & Dashboard API
+// =============================================================================
+
+/**
+ * Get the authenticated user's profile
+ */
+export async function getUserProfile() {
+    try {
+        const authHeaders = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/api/v1/profile`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
+        });
+        if (!response.ok) {
+            if (response.status === 401) return null;
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to fetch profile');
+        }
+        return await response.json();
+    } catch (error) {
+        if (error.message?.includes('Failed to fetch')) throw new Error('Unable to connect to server');
+        throw error;
+    }
+}
+
+/**
+ * Update user profile
+ */
+export async function updateUserProfile(data) {
+    try {
+        const authHeaders = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/api/v1/profile`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
+            body: JSON.stringify(data),
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to update profile');
+        }
+        return await response.json();
+    } catch (error) {
+        if (error.message?.includes('Failed to fetch')) throw new Error('Unable to connect to server');
+        throw error;
+    }
+}
+
+/**
+ * Get user dashboard stats
+ */
+export async function getUserStats() {
+    try {
+        const authHeaders = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/api/v1/profile/stats`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
+        });
+        if (!response.ok) {
+            if (response.status === 401) return null;
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to fetch stats');
+        }
+        return await response.json();
+    } catch (error) {
+        if (error.message?.includes('Failed to fetch')) throw new Error('Unable to connect to server');
+        throw error;
+    }
+}
+
+/**
+ * Get user AI memories
+ */
+export async function getUserMemories(memoryType = null, limit = 20) {
+    try {
+        let url = `${API_BASE_URL}/api/v1/profile/memories?limit=${encodeURIComponent(limit)}`;
+        if (memoryType) url += `&memory_type=${encodeURIComponent(memoryType)}`;
+        const authHeaders = await getAuthHeaders();
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
+        });
+        if (!response.ok) {
+            if (response.status === 401) return null;
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to fetch memories');
+        }
+        return await response.json();
+    } catch (error) {
+        if (error.message?.includes('Failed to fetch')) throw new Error('Unable to connect to server');
+        throw error;
+    }
+}
+
+/**
+ * Clear all AI memories
+ */
+export async function clearUserMemories() {
+    try {
+        const authHeaders = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/api/v1/profile/memories`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to clear memories');
+        }
+        return await response.json();
+    } catch (error) {
+        if (error.message?.includes('Failed to fetch')) throw new Error('Unable to connect to server');
+        throw error;
+    }
+}
+
+/**
+ * Export all user data (DPDPA / GDPR)
+ */
+export async function exportUserData() {
+    try {
+        const authHeaders = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/api/v1/profile/export`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to export data');
+        }
+        return await response.json();
+    } catch (error) {
+        if (error.message?.includes('Failed to fetch')) throw new Error('Unable to connect to server');
+        throw error;
+    }
+}
+
+/**
+ * Permanently delete user account and all data
+ */
+export async function deleteUserAccount() {
+    try {
+        const authHeaders = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/api/v1/profile/delete-account`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to delete account');
+        }
+        return await response.json();
+    } catch (error) {
+        if (error.message?.includes('Failed to fetch')) throw new Error('Unable to connect to server');
+        throw error;
+    }
+}
+
 export default {
     sendChatMessage,
     getChatSessions,
@@ -413,4 +570,11 @@ export default {
     uploadFile,
     analyzeDocument,
     exchangeTransferCode,
+    getUserProfile,
+    updateUserProfile,
+    getUserStats,
+    getUserMemories,
+    clearUserMemories,
+    exportUserData,
+    deleteUserAccount,
 };

@@ -94,7 +94,7 @@ jobs:
 
       - name: Copy docker-compose to VM
         run: |
-          scp -v -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             docker-compose.yml \
             ${{ secrets.VM_USERNAME }}@${{ secrets.VM_HOST }}:${{ env.VM_PROJECT_DIR }}/docker-compose.yml
 

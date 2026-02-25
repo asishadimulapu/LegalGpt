@@ -4,9 +4,9 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { Drawer } from 'expo-router/drawer';
-import { DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
+import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
@@ -56,11 +56,6 @@ function CustomDrawerContent(props) {
         } else {
             setSessions([]);
         }
-    };
-
-    const loadUser = async () => {
-        const userData = await getUser();
-        setUser(userData);
     };
 
     const loadSessions = async () => {
@@ -175,6 +170,31 @@ function CustomDrawerContent(props) {
                         </View>
                     </View>
                 )}
+                {/* Explore Section */}
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <Feather name="compass" size={14} color={COLORS.textLight} />
+                        <Text style={styles.sectionTitle}>Explore</Text>
+                    </View>
+                    <View style={styles.sessionList}>
+                        <Pressable
+                            style={[styles.sessionItem, pathname === '/rights' && styles.sessionItemActive]}
+                            onPress={() => { router.push('/rights'); props.navigation.closeDrawer(); }}
+                        >
+                            <Feather name="shield" size={14} color={pathname === '/rights' ? COLORS.primary : COLORS.textLight} />
+                            <Text style={[styles.sessionTitle, pathname === '/rights' && { color: COLORS.primary }]}>Know Your Rights</Text>
+                        </Pressable>
+                        {user && (
+                            <Pressable
+                                style={[styles.sessionItem, pathname === '/profile' && styles.sessionItemActive]}
+                                onPress={() => { router.push('/profile'); props.navigation.closeDrawer(); }}
+                            >
+                                <Feather name="user" size={14} color={pathname === '/profile' ? COLORS.primary : COLORS.textLight} />
+                                <Text style={[styles.sessionTitle, pathname === '/profile' && { color: COLORS.primary }]}>My Profile</Text>
+                            </Pressable>
+                        )}
+                    </View>
+                </View>
             </DrawerContentScrollView>
 
             {/* Footer */}
@@ -283,6 +303,8 @@ export default function RootLayout() {
                 <Drawer.Screen name="terms" options={{ drawerItemStyle: { display: 'none' } }} />
                 <Drawer.Screen name="disclaimer" options={{ drawerItemStyle: { display: 'none' } }} />
                 <Drawer.Screen name="contact" options={{ drawerItemStyle: { display: 'none' } }} />
+                <Drawer.Screen name="rights" options={{ drawerItemStyle: { display: 'none' } }} />
+                <Drawer.Screen name="profile" options={{ drawerItemStyle: { display: 'none' } }} />
             </Drawer>
         </View>
     );
@@ -360,6 +382,11 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.darkCard,
         padding: 10,
         borderRadius: RADIUS.md,
+    },
+    sessionItemActive: {
+        borderLeftWidth: 2,
+        borderLeftColor: COLORS.primary,
+        backgroundColor: `${COLORS.primary}15`,
     },
     sessionInfo: {
         flex: 1,

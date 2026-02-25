@@ -16,6 +16,9 @@ export default function ChatBubble({
     isFallback = false,
     latency = null,
     timestamp = null,
+    hasFile = false,
+    fileName = null,
+    basedOnFile = false,
 }) {
     const getConfidence = () => {
         if (isFallback) return { level: 'low', value: 0, text: 'No match found' };
@@ -48,6 +51,22 @@ export default function ChatBubble({
                 role === 'user' ? styles.bubbleUser : styles.bubbleBot,
                 isFallback && styles.bubbleFallback,
             ]}>
+                {/* File Attachment Indicator (user messages) */}
+                {role === 'user' && hasFile && fileName && (
+                    <View style={styles.fileBadge}>
+                        <Feather name="file-text" size={12} color={COLORS.primary} />
+                        <Text style={styles.fileBadgeText} numberOfLines={1}>{fileName}</Text>
+                    </View>
+                )}
+
+                {/* Based on File Indicator (bot responses) */}
+                {role === 'bot' && basedOnFile && (
+                    <View style={styles.basedOnFileBanner}>
+                        <Feather name="file-text" size={13} color={COLORS.accentBlue} />
+                        <Text style={styles.basedOnFileText}>Based on uploaded document</Text>
+                    </View>
+                )}
+
                 {/* Fallback Notice */}
                 {isFallback && role === 'bot' && (
                     <View style={styles.fallbackBanner}>
@@ -285,5 +304,37 @@ const styles = StyleSheet.create({
     timestampUser: {
         color: 'rgba(255,255,255,0.7)',
         textAlign: 'right',
+    },
+    fileBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(38, 184, 184, 0.12)',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: RADIUS.sm,
+        marginBottom: SPACING.xs,
+        alignSelf: 'flex-start',
+    },
+    fileBadgeText: {
+        fontSize: 12,
+        fontFamily: 'Inter_500Medium',
+        color: COLORS.primary,
+        maxWidth: 180,
+    },
+    basedOnFileBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: RADIUS.sm,
+        marginBottom: SPACING.xs,
+    },
+    basedOnFileText: {
+        fontSize: 12,
+        fontFamily: 'Inter_500Medium',
+        color: '#3B82F6',
     },
 });

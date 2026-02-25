@@ -3,7 +3,7 @@
  * Provides scaling functions for different screen sizes
  */
 
-import { Dimensions, PixelRatio, Platform } from 'react-native';
+import { Dimensions } from 'react-native';
 
 // Get screen dimensions
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');

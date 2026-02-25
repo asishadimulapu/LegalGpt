@@ -479,15 +479,15 @@ async def get_google_oauth_url(source: Optional[str] = None, mobile_redirect: Op
     if source == "mobile":
         if mobile_redirect:
             # Validate redirect URI scheme to prevent Open Redirect attacks
-            # Only allow specific schemes: 'exp' (Expo Go) and 'nyayasahay' (Production App)
-            allowed_schemes = {"exp", "nyayasahay"}
+            # Only allow specific schemes: 'exp' (Expo Go) and 'law-gpt' (Production App)
+            allowed_schemes = {"exp", "law-gpt"}
             try:
                 scheme = mobile_redirect.split(":")[0]
                 if scheme not in allowed_schemes:
                     logger.warning(f"Blocked invalid mobile redirect scheme: {scheme}")
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Invalid redirect URI scheme. Allowed: exp, nyayasahay"
+                        detail="Invalid redirect URI scheme. Allowed: exp, law-gpt"
                     )
             except IndexError:
                 raise HTTPException(

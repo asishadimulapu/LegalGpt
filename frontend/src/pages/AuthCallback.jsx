@@ -102,7 +102,7 @@ function AuthCallback({ onLoginSuccess }) {
 
                 if (isMobile) {
                     // Extract mobile redirect URI from state
-                    let mobileRedirectBase = 'nyayasahay://auth/callback'; // Default fallback
+                    let mobileRedirectBase = 'law-gpt://auth/callback'; // Default fallback
 
                     if (state.startsWith('mobile.')) {
                         try {
@@ -116,7 +116,7 @@ function AuthCallback({ onLoginSuccess }) {
                                 const decoded = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
 
                                 // Anti-Open Redirect: Validate scheme
-                                const allowedSchemes = ['exp://', 'nyayasahay://'];
+                                const allowedSchemes = ['exp://', 'law-gpt://'];
                                 const isValidScheme = allowedSchemes.some(scheme => decoded.startsWith(scheme));
 
                                 if (isValidScheme) {
@@ -124,7 +124,7 @@ function AuthCallback({ onLoginSuccess }) {
                                 } else {
                                     console.warn('Blocked potentially unsafe redirect:', decoded);
                                     // Fallback to default
-                                    mobileRedirectBase = 'nyayasahay://auth/callback';
+                                    mobileRedirectBase = 'law-gpt://auth/callback';
                                 }
                             }
                         } catch (e) {

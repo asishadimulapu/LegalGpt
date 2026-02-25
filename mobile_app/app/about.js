@@ -3,7 +3,7 @@
  * Matches web About.jsx structure with responsive design
  */
 
-import { View, Text, StyleSheet, ScrollView, Pressable, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -11,7 +11,6 @@ import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
-import { wp, hp, ms, screenSize } from '../constants/responsive';
 
 
 const TECH_STACK = [

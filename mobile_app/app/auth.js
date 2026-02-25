@@ -3,7 +3,7 @@
  * Pixel-perfect replica of web AuthModal.jsx with responsive design
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
     View,
     Text,
@@ -23,7 +23,6 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
-import { wp, hp, ms, screenSize } from '../constants/responsive';
 import { registerUser, loginUser, saveUser } from '../services/api';
 
 // API base URL (same as api.js)
@@ -61,7 +60,7 @@ export default function AuthScreen() {
         try {
             // Generate the correct return URL for this environment
             // Expo Go: exp://192.168.x.x:8081/--/auth/callback
-            // Standalone build: nyayasahay://auth/callback
+            // Standalone build: law-gpt://auth/callback
             const returnUrl = Linking.createURL('auth/callback');
             console.log('📱 Return URL:', returnUrl);
 
