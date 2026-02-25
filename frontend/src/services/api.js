@@ -4,8 +4,20 @@
  */
 
 // Use environment variable in production, fallback to localhost for development
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
     (import.meta.env.PROD ? '' : 'http://localhost:8000');
+
+/**
+ * Handle 401 responses globally — clear expired session and notify app
+ */
+function handleSessionExpired() {
+    const saved = localStorage.getItem('nyayasahay_user');
+    if (saved) {
+        localStorage.removeItem('nyayasahay_user');
+        // Dispatch custom event so App.jsx can update its state
+        window.dispatchEvent(new CustomEvent('auth:expired'));
+    }
+}
 
 
 /**
@@ -272,7 +284,7 @@ export async function sendChatWithFile(query, fileContext, sessionId = null, doc
             document_content: fileContext,
             question: query,
         };
-        
+
         if (sessionId) {
             requestBody.session_id = sessionId;
         }
@@ -369,7 +381,10 @@ export async function getUserProfile() {
             headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         });
         if (!response.ok) {
-            if (response.status === 401) return null;
+            if (response.status === 401) {
+                handleSessionExpired();
+                return null;
+            }
             const err = await response.json().catch(() => ({}));
             throw new Error(err.detail || 'Failed to fetch profile');
         }

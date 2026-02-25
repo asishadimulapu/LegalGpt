@@ -63,6 +63,16 @@ function AppLayout() {
     }
   });
 
+  // Listen for session expiry events from api.js (e.g. 401 responses)
+  React.useEffect(() => {
+    const handleExpired = () => {
+      setUser(null);
+      navigate('/');
+    };
+    window.addEventListener('auth:expired', handleExpired);
+    return () => window.removeEventListener('auth:expired', handleExpired);
+  }, [navigate]);
+
   const isAuthenticated = !!user;
 
   // ── Auth helpers ──────────────────────────────────

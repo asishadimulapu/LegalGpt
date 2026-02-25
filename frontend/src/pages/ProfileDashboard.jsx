@@ -239,8 +239,8 @@ function ProfileDashboard({ user, onLogout }) {
       <div className="pf-page">
         <div className="pf-loader">
           <AlertTriangle size={28} />
-          <p>Unable to load profile. Please sign in.</p>
-          <button className="pf-btn pf-btn-primary" onClick={() => navigate('/')}>Go Home</button>
+          <p>Your session has expired. Please sign in again.</p>
+          <button className="pf-btn pf-btn-primary" onClick={() => { if (onLogout) onLogout(); navigate('/'); }}>Sign In</button>
         </div>
       </div>
     );
