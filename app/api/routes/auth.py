@@ -693,7 +693,7 @@ async def google_oauth_callback(
         
         return GoogleAuthResponse(
             access_token=access_token,
-            user=UserResponse(
+            user=AdminUserResponse(
                 id=user.id,
                 email=user.email,
                 full_name=user.full_name,
@@ -827,11 +827,12 @@ async def google_mobile_auth(
         
         return GoogleAuthResponse(
             access_token=access_token,
-            user=UserResponse(
+            user=AdminUserResponse(
                 id=user.id,
                 email=user.email,
                 full_name=user.full_name,
                 is_active=user.is_active,
+                is_superuser=user.is_superuser,
                 created_at=user.created_at
             )
         )
