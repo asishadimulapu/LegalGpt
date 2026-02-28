@@ -452,7 +452,7 @@ class GoogleAuthResponse(BaseModel):
     """Response for successful Google OAuth."""
     access_token: str
     token_type: str = "bearer"
-    user: UserResponse
+    user: AdminUserResponse
     transfer_code: Optional[str] = None  # Temporary code for mobile to exchange for token
 
 
