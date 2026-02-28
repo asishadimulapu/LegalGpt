@@ -164,9 +164,10 @@ function AuthCallback({ onLoginSuccess }) {
                 const userData = {
                     email: data.user.email,
                     name: data.user.full_name,
-                    token: data.access_token
+                    token: data.access_token,
+                    is_superuser: data.user.is_superuser || false,
                 };
-                localStorage.setItem('nyayasahay_user', JSON.stringify(userData));
+                localStorage.setItem('LawGPT_user', JSON.stringify(userData));
 
                 // Notify parent component
                 if (onLoginSuccess) {
@@ -225,7 +226,7 @@ function AuthCallback({ onLoginSuccess }) {
                     <>
                         <div className="auth-callback-success">✓</div>
                         <h2>Sign-in Successful!</h2>
-                        <p>Please return to the NyayaSahay app to continue.</p>
+                        <p>Please return to the LawGPT app to continue.</p>
                     </>
                 )}
             </div>

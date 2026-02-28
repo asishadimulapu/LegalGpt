@@ -1,5 +1,5 @@
 /**
- * Landing Page Component - NyayaSahay Style with Lucide Icons
+ * Landing Page Component - LawGPT Style with Lucide Icons
  * Hero section with chat preview, features, and how it works
  * Section IDs for smooth scroll navigation
  */

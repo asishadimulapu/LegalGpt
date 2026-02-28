@@ -20,6 +20,7 @@ import {
   ChevronDown,
   Info,
   HelpCircle,
+  Settings,
 } from 'lucide-react';
 import '../styles/sidebar.css';
 
@@ -95,6 +96,21 @@ function Sidebar({ user, onLogout, compact = false, mobileMenuOpen = false }) {
             </Link>
           ))}
         </div>
+
+        {/* Admin link — only for superusers */}
+        {user?.is_superuser && (
+          <div className="nav-group">
+            {!compact && <span className="nav-group-label">Admin</span>}
+            <Link
+              to="/admin"
+              className={`sidebar-link ${location.pathname.startsWith('/admin') ? 'active' : ''}`}
+              title={compact ? 'Admin Dashboard' : undefined}
+            >
+              <Settings size={18} />
+              {!compact && <span>Admin Dashboard</span>}
+            </Link>
+          </div>
+        )}
       </nav>
 
       {/* ── User Card + Dropdown ─────────────────── */}

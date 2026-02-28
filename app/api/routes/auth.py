@@ -17,7 +17,7 @@ from sqlalchemy.exc import SQLAlchemyError, OperationalError, IntegrityError
 
 from app.db.database import get_db
 from app.db.crud import UserCRUD
-from app.schemas.user import UserCreate, UserLogin, UserResponse, Token
+from app.schemas.user import UserCreate, UserLogin, UserResponse, AdminUserResponse, Token
 from app.utils.auth import create_access_token, validate_password_strength
 from app.utils.audit import AuditLogger
 from app.utils.logging_config import get_logger
@@ -359,11 +359,11 @@ async def login(
 
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me", response_model=AdminUserResponse)
 async def get_current_user_profile(
     db: Session = Depends(get_db),
     credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
-) -> UserResponse:
+) -> AdminUserResponse:
     """
     Get current user's profile.
     Requires authentication via JWT token.
@@ -416,11 +416,12 @@ async def get_current_user_profile(
             detail="Account is disabled"
         )
     
-    return UserResponse(
+    return AdminUserResponse(
         id=user.id,
         email=user.email,
         full_name=user.full_name,
         is_active=user.is_active,
+        is_superuser=user.is_superuser,
         created_at=user.created_at
     )
 
@@ -679,11 +680,12 @@ async def google_oauth_callback(
             transfer_code = secrets.token_urlsafe(16)
             await _store_temp_auth_code(transfer_code, {
                 "access_token": access_token,
-                "user": UserResponse(
+                "user": AdminUserResponse(
                     id=user.id,
                     email=user.email,
                     full_name=user.full_name,
                     is_active=user.is_active,
+                    is_superuser=user.is_superuser,
                     created_at=user.created_at
                 ),
                 "expires_at": datetime.now(timezone.utc) + timedelta(minutes=1)
@@ -696,6 +698,7 @@ async def google_oauth_callback(
                 email=user.email,
                 full_name=user.full_name,
                 is_active=user.is_active,
+                is_superuser=user.is_superuser,
                 created_at=user.created_at
             ),
             transfer_code=transfer_code

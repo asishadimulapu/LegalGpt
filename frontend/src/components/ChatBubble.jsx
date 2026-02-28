@@ -1,5 +1,5 @@
 /**
- * ChatBubble Component - NyayaSahay Style with Lucide Icons
+ * ChatBubble Component - LawGPT Style with Lucide Icons
  * Teal user bubbles, white bot bubbles
  */
 

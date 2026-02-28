@@ -1,5 +1,5 @@
 /**
- * Footer Component - NyayaSahay Design with Lucide Icons
+ * Footer Component - LawGPT Design with Lucide Icons
  */
 
 import React from 'react';
@@ -73,7 +73,7 @@ function Footer() {
                 {/* Disclaimer */}
                 <div className="footer-disclaimer">
                     <p>
-                        <strong>Disclaimer:</strong> NyayaSahay provides legal information for educational
+                        <strong>Disclaimer:</strong> LawGPT provides legal information for educational
                         purposes only and does not constitute legal advice. For specific legal matters,
                         please consult a qualified legal professional. The information provided is based
                         on Indian law and may not be applicable in all situations.

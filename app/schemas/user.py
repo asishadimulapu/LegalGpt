@@ -34,10 +34,18 @@ class UserLogin(BaseModel):
 
 
 class UserResponse(UserBase):
-    """Schema for user response (excludes password)."""
+    """Schema for user response (excludes password, excludes superuser flag)."""
     id: UUID
     is_active: bool
     created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class AdminUserResponse(UserResponse):
+    """Extended user response for admin-only endpoints. Includes privilege info."""
+    is_superuser: bool
     
     class Config:
         from_attributes = True

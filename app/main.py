@@ -20,6 +20,7 @@ from app.config import settings
 from app.db.database import init_db
 from app.core.vector_store import vector_store_manager
 from app.api.routes import health, chat, retrieval, auth, upload, guides, profile
+from app.api.routes import admin as admin_routes
 from app.utils.logging_config import setup_logging
 
 # Initialize logging
@@ -254,6 +255,7 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(upload.router, prefix="/api/v1")
 app.include_router(guides.router, prefix="/api/v1")
 app.include_router(profile.router, prefix="/api/v1")
+app.include_router(admin_routes.router, prefix="/api/v1")
 
 
 # =============================================================================
@@ -276,6 +278,7 @@ async def root():
             "auth": "/api/v1/auth",
             "guides": "/api/v1/guides",
             "upload": "/api/v1/upload",
-            "profile": "/api/v1/profile"
+            "profile": "/api/v1/profile",
+            "admin": "/api/v1/admin"
         }
     }

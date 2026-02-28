@@ -217,7 +217,7 @@ export async function retrieveKeySecurely(keyName) {
  */
 function openKeysDB() {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open('NyayaSahayKeys', 1);
+        const request = indexedDB.open('LawGPTKeys', 1);
         
         request.onupgradeneeded = (event) => {
             const db = event.target.result;

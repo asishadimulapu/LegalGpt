@@ -1,5 +1,5 @@
 /**
- * About Page Component - NyayaSahay Style
+ * About Page Component - LawGPT Style
  * Clean project description with modern design
  */
 
@@ -29,7 +29,7 @@ import '../styles/about.css';
 
 function About() {
     const [isVisible, setIsVisible] = useState(false);
-    const isAuthenticated = !!localStorage.getItem('nyayasahay_user');
+    const isAuthenticated = !!localStorage.getItem('LawGPT_user');
 
     useEffect(() => {
         setIsVisible(true);
@@ -101,7 +101,7 @@ function About() {
                     )}
                     <div className="about-hero-text">
                         <div className="about-badge">
-                            <Scale size={20} /> About NyayaSahay
+                            <Scale size={20} /> About LawGPT
                         </div>
                         <h1>AI-Powered <span className="gradient-text">Legal Assistant</span></h1>
                         <p>
@@ -324,7 +324,7 @@ function About() {
                 <section className="about-cta">
                     <div className="container">
                         <div className="cta-content">
-                            <h2>Ready to Try <span className="gradient-text">NyayaSahay?</span></h2>
+                            <h2>Ready to Try <span className="gradient-text">LawGPT?</span></h2>
                             <p>Start asking your legal questions now</p>
                             <Link to="/chat" className="btn btn-primary">
                                 Start Free Consultation

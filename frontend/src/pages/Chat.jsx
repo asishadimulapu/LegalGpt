@@ -1,5 +1,5 @@
 /**
- * Chat Page Component - NyayaSahay with Session History
+ * Chat Page Component - LawGPT with Session History
  * Full-screen chat interface with persistent sessions
  */
 
@@ -377,7 +377,7 @@ function Chat({ user, onLogout, onAuthClick }) {
                     <header className="guest-chat-header">
                         <a href="/" className="guest-chat-brand">
                             <Scale size={22} />
-                            <span>NyayaSahay</span>
+                            <span>LawGPT</span>
                         </a>
                         <div className="guest-chat-actions">
                             <button className="guest-signin-btn" onClick={() => onAuthClick?.('signin')}>Sign In</button>
@@ -409,7 +409,7 @@ function Chat({ user, onLogout, onAuthClick }) {
                             <div className="empty-icon">
                                 <Scale size={40} />
                             </div>
-                            <h2>Welcome to NyayaSahay</h2>
+                            <h2>Welcome to LawGPT</h2>
                             <p>Your AI-powered legal assistant for Indian law</p>
                             <p className="empty-subtitle">
                                 Ask any question about IPC, CrPC, Constitution, or your legal rights

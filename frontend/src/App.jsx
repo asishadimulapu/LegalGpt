@@ -35,8 +35,14 @@ import ProfileDashboard from './pages/ProfileDashboard';
 import AuthCallback from './pages/AuthCallback';
 import Rights from './pages/Rights';
 
+// Admin pages
+import AdminLayout from './components/AdminLayout';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import UserManagement from './pages/admin/UserManagement';
+import QueryAnalytics from './pages/admin/QueryAnalytics';
+
 // Services
-import { registerUser, loginUser } from './services/api';
+import { registerUser, loginUser, fetchCurrentUser } from './services/api';
 
 /* ── Guest Layout (Header + Footer wrapper) ────────── */
 function GuestLayout({ onAuthClick }) {
@@ -55,10 +61,17 @@ function AppLayout() {
   const [authModal, setAuthModal] = useState({ isOpen: false, mode: 'signin' });
   const [user, setUser] = useState(() => {
     try {
-      const saved = localStorage.getItem('nyayasahay_user');
+      // Migrate from old key if needed
+      const OLD_KEY = 'nyayasahay_user';
+      const KEY = 'LawGPT_user';
+      if (!localStorage.getItem(KEY) && localStorage.getItem(OLD_KEY)) {
+        localStorage.setItem(KEY, localStorage.getItem(OLD_KEY));
+        localStorage.removeItem(OLD_KEY);
+      }
+      const saved = localStorage.getItem(KEY);
       return saved ? JSON.parse(saved) : null;
     } catch {
-      localStorage.removeItem('nyayasahay_user');
+      localStorage.removeItem('LawGPT_user');
       return null;
     }
   });
@@ -85,16 +98,29 @@ function AppLayout() {
       if (authModal.mode === 'signin') {
         const res = await loginUser(formData.email, formData.password);
         const u = { email: formData.email, token: res.access_token };
+        localStorage.setItem('LawGPT_user', JSON.stringify(u));
+        // Fetch full profile to get is_superuser
+        const profile = await fetchCurrentUser();
+        if (profile) {
+          u.is_superuser = profile.is_superuser;
+          u.full_name = profile.full_name;
+          localStorage.setItem('LawGPT_user', JSON.stringify(u));
+        }
         setUser(u);
-        localStorage.setItem('nyayasahay_user', JSON.stringify(u));
         closeAuth();
         navigate('/chat');
       } else {
         await registerUser(formData.name, formData.email, formData.password);
         const res = await loginUser(formData.email, formData.password);
         const u = { email: formData.email, name: formData.name, token: res.access_token };
+        localStorage.setItem('LawGPT_user', JSON.stringify(u));
+        const profile = await fetchCurrentUser();
+        if (profile) {
+          u.is_superuser = profile.is_superuser;
+          u.full_name = profile.full_name;
+          localStorage.setItem('LawGPT_user', JSON.stringify(u));
+        }
         setUser(u);
-        localStorage.setItem('nyayasahay_user', JSON.stringify(u));
         closeAuth();
         navigate('/chat');
       }
@@ -105,12 +131,12 @@ function AppLayout() {
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
-    localStorage.setItem('nyayasahay_user', JSON.stringify(userData));
+    localStorage.setItem('LawGPT_user', JSON.stringify(userData));
   };
 
   const handleLogout = () => {
     setUser(null);
-    localStorage.removeItem('nyayasahay_user');
+    localStorage.removeItem('LawGPT_user');
     navigate('/');
   };
 
@@ -124,20 +150,30 @@ function AppLayout() {
         <Route path="/auth/callback" element={<AuthCallback onLoginSuccess={handleLoginSuccess} />} />
 
         {isAuthenticated ? (
-          /* ═══ Authenticated: App Shell ═══ */
-          <Route path="/" element={<AppShell user={user} onLogout={handleLogout} />}>
-            <Route index element={<Navigate to="/chat" replace />} />
-            <Route path="chat" element={<Chat user={user} onLogout={handleLogout} />} />
-            <Route path="rights" element={<Rights />} />
-            <Route path="profile" element={<ProfileDashboard user={user} onLogout={handleLogout} />} />
-            <Route path="about" element={<About />} />
-            <Route path="privacy" element={<Privacy />} />
-            <Route path="terms" element={<Terms />} />
-            <Route path="contact" element={<Contact />} />
-            <Route path="faq" element={<FAQ />} />
-            <Route path="disclaimer" element={<Disclaimer />} />
-            <Route path="*" element={<Navigate to="/chat" replace />} />
-          </Route>
+          /* ═══ Authenticated ═══ */
+          <>
+            {/* Admin routes — standalone layout (no AppShell sidebar) */}
+            <Route path="/admin" element={<AdminLayout user={user} />}>
+              <Route index element={<AdminDashboard />} />
+              <Route path="users" element={<UserManagement />} />
+              <Route path="analytics" element={<QueryAnalytics />} />
+            </Route>
+
+            {/* Main app routes — inside AppShell */}
+            <Route path="/" element={<AppShell user={user} onLogout={handleLogout} />}>
+              <Route index element={<Navigate to="/chat" replace />} />
+              <Route path="chat" element={<Chat user={user} onLogout={handleLogout} />} />
+              <Route path="rights" element={<Rights />} />
+              <Route path="profile" element={<ProfileDashboard user={user} onLogout={handleLogout} />} />
+              <Route path="about" element={<About />} />
+              <Route path="privacy" element={<Privacy />} />
+              <Route path="terms" element={<Terms />} />
+              <Route path="contact" element={<Contact />} />
+              <Route path="faq" element={<FAQ />} />
+              <Route path="disclaimer" element={<Disclaimer />} />
+              <Route path="*" element={<Navigate to="/chat" replace />} />
+            </Route>
+          </>
         ) : (
           /* ═══ Guest ═══ */
           <>

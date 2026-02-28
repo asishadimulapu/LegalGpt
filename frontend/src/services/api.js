@@ -11,9 +11,9 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
  * Handle 401 responses globally — clear expired session and notify app
  */
 function handleSessionExpired() {
-    const saved = localStorage.getItem('nyayasahay_user');
+    const saved = localStorage.getItem('LawGPT_user');
     if (saved) {
-        localStorage.removeItem('nyayasahay_user');
+        localStorage.removeItem('LawGPT_user');
         // Dispatch custom event so App.jsx can update its state
         window.dispatchEvent(new CustomEvent('auth:expired'));
     }
@@ -24,7 +24,7 @@ function handleSessionExpired() {
  * Get auth headers if user is logged in
  */
 function getAuthHeaders() {
-    const saved = localStorage.getItem('nyayasahay_user');
+    const saved = localStorage.getItem('LawGPT_user');
     if (saved) {
         const user = JSON.parse(saved);
         if (user.token) {
@@ -347,11 +347,28 @@ export async function sendChatWithFile(query, fileContext, sessionId = null, doc
 }
 
 
+/**
+ * Fetch current user profile (includes is_superuser for admin access)
+ */
+export async function fetchCurrentUser() {
+    const headers = getAuthHeaders();
+    if (!headers.Authorization) return null;
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, { headers });
+        if (!response.ok) return null;
+        return await response.json();
+    } catch {
+        return null;
+    }
+}
+
+
 export default {
     sendChatMessage,
     checkHealth,
     registerUser,
     loginUser,
+    fetchCurrentUser,
     uploadFile,
     sendChatWithFile,
     getChatSessions,

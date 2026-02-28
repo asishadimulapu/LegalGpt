@@ -99,7 +99,7 @@ function AuthModal({ isOpen, mode, onClose, onSubmit, onSwitchMode }) {
                     <div className="auth-logo">
                         <Scale size={28} />
                     </div>
-                    <h2>Welcome to NyayaSahay</h2>
+                    <h2>Welcome to LawGPT</h2>
                     <p>
                         {isSignIn
                             ? 'Sign in to access your legal consultation history'
