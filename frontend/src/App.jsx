@@ -34,6 +34,7 @@ import Disclaimer from './pages/Disclaimer';
 import ProfileDashboard from './pages/ProfileDashboard';
 import AuthCallback from './pages/AuthCallback';
 import Rights from './pages/Rights';
+import ResetPassword from './pages/ResetPassword';
 
 // Admin pages
 import AdminLayout from './components/AdminLayout';
@@ -148,6 +149,8 @@ function AppLayout() {
       <Routes>
         {/* OAuth callback — outside any layout */}
         <Route path="/auth/callback" element={<AuthCallback onLoginSuccess={handleLoginSuccess} />} />
+        {/* Password reset — outside any layout */}
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {isAuthenticated ? (
           /* ═══ Authenticated ═══ */

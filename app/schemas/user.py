@@ -22,8 +22,8 @@ class UserCreate(UserBase):
     """Schema for user registration."""
     password: str = Field(
         ..., 
-        min_length=6, 
-        description="Password (min 6 characters)"
+        min_length=12, 
+        description="Password (min 12 characters)"
     )
 
 
@@ -75,5 +75,23 @@ class Token(BaseModel):
 
 class TokenPayload(BaseModel):
     """JWT token payload."""
+
+
+# =============================================================================
+# Password Reset Schemas
+# =============================================================================
+class ForgotPasswordRequest(BaseModel):
+    """Request body for forgot-password (email only)."""
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Request body to set a new password using a reset token."""
+    token: str = Field(..., min_length=1, description="Password reset token from email link")
+    new_password: str = Field(
+        ...,
+        min_length=12,
+        description="New password (min 12 characters)"
+    )
     sub: str  # User ID
     exp: datetime  # Expiration time

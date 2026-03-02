@@ -193,7 +193,7 @@ class ServerEncryptionManager:
         Create searchable hash of content without storing plaintext.
         Uses HMAC-SHA256 for secure indexing.
         """
-        return hmac.new(
+        return hmac.HMAC(
             self.metadata_key,
             plaintext.encode(),
             hashlib.sha256

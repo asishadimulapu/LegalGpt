@@ -244,7 +244,7 @@ class VectorStoreManager:
         if self._use_pgvector and PGVECTOR_AVAILABLE:
             try:
                 return pgvector_store.get_document_count()
-            except:
+            except Exception:
                 pass
         
         if self._faiss_store:

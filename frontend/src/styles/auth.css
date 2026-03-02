@@ -284,6 +284,57 @@
     text-decoration: underline;
 }
 
+/* Forgot password link */
+.forgot-password-link {
+    display: inline-block;
+    margin-top: 6px;
+    background: none;
+    border: none;
+    color: #26B8B8;
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 0;
+    text-align: right;
+    width: 100%;
+}
+
+.forgot-password-link:hover {
+    color: #3dd4d4;
+    text-decoration: underline;
+}
+
+/* Success message (password reset confirmation) */
+.auth-success {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm, 8px);
+    padding: var(--spacing-lg, 24px) var(--spacing-md, 16px);
+    background: rgba(34, 197, 94, 0.12);
+    color: #86efac;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: var(--radius-md, 10px);
+    font-size: 0.95rem;
+    text-align: center;
+    line-height: 1.5;
+}
+
+/* Warning message (OAuth account detected) */
+.auth-warning {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm, 8px);
+    padding: var(--spacing-lg, 24px) var(--spacing-md, 16px);
+    background: rgba(234, 179, 8, 0.12);
+    color: #fde68a;
+    border: 1px solid rgba(234, 179, 8, 0.3);
+    border-radius: var(--radius-md, 10px);
+    font-size: 0.95rem;
+    text-align: center;
+    line-height: 1.5;
+}
+
 /* =============================================================================
    RESPONSIVE & ACCESSIBILITY FIXES
    ============================================================================= */

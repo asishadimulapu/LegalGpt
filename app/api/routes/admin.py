@@ -8,7 +8,7 @@ All routes require is_superuser=True.
 import logging
 import math
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -47,7 +47,7 @@ async def get_dashboard_stats(
     db: Session = Depends(get_db),
 ):
     """Aggregated stats for the admin dashboard overview."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_ago = now - timedelta(days=7)
 
@@ -270,7 +270,7 @@ async def update_user(
     if updates.full_name is not None:
         user.full_name = updates.full_name
 
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(user)
 
@@ -320,7 +320,7 @@ async def get_query_analytics(
     db: Session = Depends(get_db),
 ):
     """Aggregated query analytics for charts."""
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
     total = db.query(func.count(QueryLog.id)).filter(
         QueryLog.created_at >= cutoff
@@ -484,12 +484,27 @@ async def list_audit_logs(
             desc(AuditLog.timestamp)
         ).offset(offset).limit(per_page).all()
 
+        # Batch-fetch user emails to avoid N+1 queries
+        user_ids = {log.user_id for log in logs if log.user_id}
+        user_email_map = {}
+        if user_ids:
+            rows = db.query(User.id, User.email).filter(User.id.in_(user_ids)).all()
+            user_email_map = {uid: email for uid, email in rows}
+
         items = []
         for log in logs:
-            user_email = None
-            if log.user_id:
-                user = db.query(User.email).filter(User.id == log.user_id).first()
-                user_email = user[0] if user else None
+            user_email = user_email_map.get(log.user_id) if log.user_id else None
+
+            # Model stores details_encrypted; decrypt or pass as-is
+            details_data = None
+            if log.details_encrypted:
+                try:
+                    import json
+                    from app.core.encryption import decrypt_metadata
+                    decrypted = decrypt_metadata(log.details_encrypted)
+                    details_data = json.loads(decrypted)
+                except Exception:
+                    details_data = {"encrypted": True, "preview": "Unable to decrypt"}
 
             items.append(AuditLogItem(
                 id=log.id,
@@ -497,7 +512,7 @@ async def list_audit_logs(
                 user_email=user_email,
                 ip_address=log.ip_address,
                 severity=log.severity,
-                details=log.details,
+                details=details_data,
                 timestamp=log.timestamp,
             ))
 

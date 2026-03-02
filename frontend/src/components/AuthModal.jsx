@@ -5,8 +5,9 @@
 
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Scale, X, Mail, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Scale, X, Mail, Lock, User, Eye, EyeOff, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
 import GoogleAuth from './GoogleAuth';
+import { forgotPassword } from '../services/api';
 import '../styles/auth.css';
 
 function AuthModal({ isOpen, mode, onClose, onSubmit, onSwitchMode }) {
@@ -19,6 +20,9 @@ function AuthModal({ isOpen, mode, onClose, onSubmit, onSwitchMode }) {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [showForgot, setShowForgot] = useState(false);
+    const [forgotEmail, setForgotEmail] = useState('');
+    const [forgotSuccess, setForgotSuccess] = useState('');
 
     const isSignIn = mode === 'signin';
 
@@ -84,6 +88,39 @@ function AuthModal({ isOpen, mode, onClose, onSubmit, onSwitchMode }) {
         }
     };
 
+    const [forgotIsOAuth, setForgotIsOAuth] = useState(false);
+
+    const handleForgotSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        setForgotSuccess('');
+        setForgotIsOAuth(false);
+        if (!forgotEmail) {
+            setError('Please enter your email address');
+            return;
+        }
+        setIsLoading(true);
+        try {
+            const res = await forgotPassword(forgotEmail);
+            if (res.oauth_account) {
+                setForgotIsOAuth(true);
+            }
+            setForgotSuccess(res.message || 'If an account with that email exists, a reset link has been sent.');
+        } catch (err) {
+            setError(err.message || 'Something went wrong');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const exitForgot = () => {
+        setShowForgot(false);
+        setForgotEmail('');
+        setForgotSuccess('');
+        setForgotIsOAuth(false);
+        setError('');
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -99,15 +136,83 @@ function AuthModal({ isOpen, mode, onClose, onSubmit, onSwitchMode }) {
                     <div className="auth-logo">
                         <Scale size={28} />
                     </div>
-                    <h2>Welcome to LawGPT</h2>
-                    <p>
-                        {isSignIn
-                            ? 'Sign in to access your legal consultation history'
-                            : 'Create an account for personalized legal guidance'
-                        }
-                    </p>
+                    {showForgot ? (
+                        <>
+                            <h2>Reset Password</h2>
+                            <p>Enter your email and we'll send you a reset link</p>
+                        </>
+                    ) : (
+                        <>
+                            <h2>Welcome to LawGPT</h2>
+                            <p>
+                                {isSignIn
+                                    ? 'Sign in to access your legal consultation history'
+                                    : 'Create an account for personalized legal guidance'
+                                }
+                            </p>
+                        </>
+                    )}
                 </div>
 
+                {showForgot ? (
+                    /* ── Forgot Password View ── */
+                    <>
+                        {forgotSuccess ? (
+                            <div className={forgotIsOAuth ? "auth-warning" : "auth-success"}>
+                                {forgotIsOAuth ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
+                                <span>{forgotSuccess}</span>
+                                {forgotIsOAuth && (
+                                    <button
+                                        type="button"
+                                        className="auth-submit"
+                                        style={{ marginTop: 12 }}
+                                        onClick={exitForgot}
+                                    >
+                                        Sign In with Google Instead
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            <form className="auth-form" onSubmit={handleForgotSubmit}>
+                                <div className="form-group">
+                                    <label htmlFor="forgot-email">
+                                        <Mail size={16} /> Email Address
+                                    </label>
+                                    <input
+                                        type="email"
+                                        id="forgot-email"
+                                        value={forgotEmail}
+                                        onChange={(e) => { setForgotEmail(e.target.value); setError(''); }}
+                                        placeholder="Enter your registered email"
+                                        autoComplete="email"
+                                        aria-required="true"
+                                    />
+                                </div>
+
+                                {error && (
+                                    <div className="auth-error">
+                                        <AlertCircle size={16} /> {error}
+                                    </div>
+                                )}
+
+                                <button type="submit" className="auth-submit" disabled={isLoading}>
+                                    {isLoading ? 'Sending…' : 'Send Reset Link'}
+                                </button>
+                            </form>
+                        )}
+
+                        <div className="auth-footer">
+                            <p>
+                                <button type="button" className="auth-switch" onClick={exitForgot}>
+                                    <ArrowLeft size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                                    Back to Sign In
+                                </button>
+                            </p>
+                        </div>
+                    </>
+                ) : (
+                    /* ── Normal Sign In / Register View ── */
+                    <>
                 {/* Google OAuth — Recommended */}
                 <div className="auth-recommended">
                     <span className="recommended-badge">✦ Recommended — Instant access</span>
@@ -187,6 +292,15 @@ function AuthModal({ isOpen, mode, onClose, onSubmit, onSwitchMode }) {
                                 Password must be at least 12 characters and include uppercase, lowercase, number, and special character
                             </small>
                         )}
+                        {isSignIn && (
+                            <button
+                                type="button"
+                                className="forgot-password-link"
+                                onClick={() => { setShowForgot(true); setError(''); setForgotEmail(formData.email); }}
+                            >
+                                Forgot password?
+                            </button>
+                        )}
                     </div>
 
                     {!isSignIn && (
@@ -237,6 +351,8 @@ function AuthModal({ isOpen, mode, onClose, onSubmit, onSwitchMode }) {
                     {' '}and{' '}
                     <Link to="/privacy" onClick={onClose} className="auth-legal-link">Privacy Policy</Link>
                 </p>
+                    </>
+                )}
             </div>
         </div>
     );

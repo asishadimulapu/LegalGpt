@@ -1,12 +1,17 @@
-# Indian Law RAG Chatbot - SQLAlchemy ORM Models
+﻿# Indian Law RAG Chatbot - SQLAlchemy ORM Models
 """
 Database models for users, chat sessions, messages, and query logs.
 Uses SQLAlchemy ORM with PostgreSQL-specific features.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
+
+
+def _utcnow():
+    """Return timezone-aware UTC datetime (replaces deprecated _utcnow)."""
+    return datetime.now(timezone.utc)
 
 from sqlalchemy import (
     Column, String, Text, Boolean, Integer, DateTime, Float,
@@ -88,14 +93,14 @@ class User(Base):
     )
     created_at = Column(
         DateTime, 
-        default=datetime.utcnow, 
+        default=_utcnow, 
         nullable=False,
         comment="Account creation timestamp"
     )
     updated_at = Column(
         DateTime, 
-        default=datetime.utcnow, 
-        onupdate=datetime.utcnow,
+        default=_utcnow, 
+        onupdate=_utcnow,
         comment="Last update timestamp"
     )
     
@@ -170,14 +175,14 @@ class ChatSession(Base):
     )
     created_at = Column(
         DateTime, 
-        default=datetime.utcnow, 
+        default=_utcnow, 
         nullable=False,
         comment="Session creation timestamp"
     )
     updated_at = Column(
         DateTime, 
-        default=datetime.utcnow, 
-        onupdate=datetime.utcnow,
+        default=_utcnow, 
+        onupdate=_utcnow,
         comment="Last activity timestamp"
     )
     
@@ -239,7 +244,7 @@ class ChatMessage(Base):
     )
     created_at = Column(
         DateTime, 
-        default=datetime.utcnow, 
+        default=_utcnow, 
         nullable=False,
         comment="Message timestamp"
     )
@@ -322,7 +327,7 @@ class QueryLog(Base):
     )
     created_at = Column(
         DateTime, 
-        default=datetime.utcnow, 
+        default=_utcnow, 
         nullable=False,
         index=True,
         comment="Query timestamp"
@@ -373,7 +378,7 @@ class ApplicationLog(Base):
     )
     created_at = Column(
         DateTime, 
-        default=datetime.utcnow, 
+        default=_utcnow, 
         nullable=False,
         index=True
     )
@@ -448,7 +453,7 @@ class DocumentEmbedding(Base):
     )
     created_at = Column(
         DateTime, 
-        default=datetime.utcnow, 
+        default=_utcnow, 
         nullable=False,
         comment="Embedding creation timestamp"
     )
@@ -473,7 +478,7 @@ class UserProfile(Base):
     
     Viva Explanation:
     - Stores user-specific details (location, case type, language)
-    - Isolated per-user — no cross-user leakage
+    - Isolated per-user â€” no cross-user leakage
     - Used by RAG pipeline to personalize retrieval and responses
     """
     __tablename__ = "user_profiles"
@@ -490,7 +495,7 @@ class UserProfile(Base):
         nullable=False,
         unique=True,
         index=True,
-        comment="Owner user — one profile per user"
+        comment="Owner user â€” one profile per user"
     )
     location = Column(
         String(255),
@@ -523,13 +528,13 @@ class UserProfile(Base):
     )
     created_at = Column(
         DateTime,
-        default=datetime.utcnow,
+        default=_utcnow,
         nullable=False
     )
     updated_at = Column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
+        default=_utcnow,
+        onupdate=_utcnow
     )
     
     # Relationship
@@ -550,7 +555,7 @@ class UserMemory(Base):
     Viva Explanation:
     - Each row is a memory "fact" extracted from conversations
     - memory_type distinguishes: 'conversation_summary', 'user_fact', 'case_detail'
-    - Indexed by user_id — queries are always scoped to one user
+    - Indexed by user_id â€” queries are always scoped to one user
     - Optional embedding for semantic memory search
     """
     __tablename__ = "user_memories"
@@ -566,7 +571,7 @@ class UserMemory(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="Owner user — strict isolation"
+        comment="Owner user â€” strict isolation"
     )
     memory_type = Column(
         String(50),
@@ -604,7 +609,7 @@ class UserMemory(Base):
     )
     created_at = Column(
         DateTime,
-        default=datetime.utcnow,
+        default=_utcnow,
         nullable=False,
         index=True
     )
@@ -702,7 +707,7 @@ class EncryptedData(Base):
     )
     created_at = Column(
         DateTime,
-        default=datetime.utcnow,
+        default=_utcnow,
         nullable=False,
         index=True,
         comment="Creation timestamp"
@@ -791,7 +796,7 @@ class AuditLog(Base):
     )
     timestamp = Column(
         DateTime,
-        default=datetime.utcnow,
+        default=_utcnow,
         nullable=False,
         index=True,
         comment="Event timestamp"
@@ -809,3 +814,58 @@ class AuditLog(Base):
     
     def __repr__(self) -> str:
         return f"<AuditLog(id={self.id}, type={self.event_type}, severity={self.severity})>"
+
+
+# =============================================================================
+# Password Reset Token Model
+# =============================================================================
+class PasswordResetToken(Base):
+    """
+    Stores hashed password-reset tokens with expiry.
+    Token is sent to user via email; only the SHA-256 hash is persisted.
+    """
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        comment="Unique token record identifier"
+    )
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="User who requested the reset"
+    )
+    token_hash = Column(
+        String(64),
+        nullable=False,
+        unique=True,
+        index=True,
+        comment="SHA-256 hash of the reset token"
+    )
+    expires_at = Column(
+        DateTime,
+        nullable=False,
+        comment="Token expiry timestamp (UTC)"
+    )
+    used = Column(
+        Boolean,
+        default=False,
+        nullable=False,
+        comment="Whether the token has been consumed"
+    )
+    created_at = Column(
+        DateTime,
+        default=_utcnow,
+        nullable=False,
+        comment="Token creation timestamp"
+    )
+
+    # Relationship
+    user = relationship("User")
+
+    def __repr__(self) -> str:
+        return f"<PasswordResetToken(id={self.id}, used={self.used})>"

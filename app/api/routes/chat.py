@@ -6,6 +6,7 @@ Main chat endpoints for the RAG-powered legal question answering.
 from typing import Optional, List
 from uuid import UUID
 import json # Added for stream_generator
+import traceback
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -169,7 +170,6 @@ async def chat(
     
     except Exception as e:
         # Enhanced structured error logging
-        import traceback
         error_details = {
             "error_type": type(e).__name__,
             "error_message": str(e),

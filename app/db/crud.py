@@ -10,7 +10,7 @@ PRODUCTION NOTES:
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
@@ -300,7 +300,7 @@ class ChatSessionCRUD:
         """
         try:
             session.title = title
-            session.updated_at = datetime.utcnow()
+            session.updated_at = datetime.now(timezone.utc)
             db.flush()
             db.commit()
             db.refresh(session)
@@ -357,7 +357,7 @@ class ChatMessageCRUD:
             ChatSession.id == session_id
         ).first()
         if session:
-            session.updated_at = datetime.utcnow()
+            session.updated_at = datetime.now(timezone.utc)
         
         db.commit()
         db.refresh(message)
@@ -466,7 +466,7 @@ class QueryLogCRUD:
         from sqlalchemy import func
         from datetime import timedelta
         
-        cutoff = datetime.utcnow() - timedelta(days=days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
         result = (
             db.query(func.avg(QueryLog.latency_ms))
             .filter(QueryLog.created_at >= cutoff)
@@ -663,7 +663,7 @@ class UserMemoryCRUD:
         try:
             count = db.query(UserMemory).filter(
                 UserMemory.expires_at.isnot(None),
-                UserMemory.expires_at < datetime.utcnow()
+                UserMemory.expires_at < datetime.now(timezone.utc)
             ).delete()
             db.commit()
             logger.info(f"Cleaned up {count} expired memories")

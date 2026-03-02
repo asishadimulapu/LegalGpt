@@ -21,7 +21,7 @@ Viva Explanation:
 import logging
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
 from sqlalchemy.orm import Session
@@ -167,7 +167,7 @@ def export_user_data(db: Session, user_id: uuid.UUID) -> Dict[str, Any]:
     ).order_by(QueryLog.created_at).all()
 
     return {
-        "exported_at": datetime.utcnow().isoformat(),
+        "exported_at": datetime.now(timezone.utc).isoformat(),
         "user": {
             "id": str(user.id),
             "email": user.email,
@@ -260,7 +260,7 @@ def audit_memory_isolation(db: Session) -> Dict[str, Any]:
         "orphaned_memories": orphaned,
         "users_with_memories": users_with_mem,
         "isolation_ok": orphaned == 0,
-        "checked_at": datetime.utcnow().isoformat(),
+        "checked_at": datetime.now(timezone.utc).isoformat(),
     }
 
     if orphaned > 0:

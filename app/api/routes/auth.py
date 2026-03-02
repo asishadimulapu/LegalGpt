@@ -887,3 +887,167 @@ async def exchange_transfer_code(request: ExchangeRequest):
         access_token=token,
         user=user
     )
+
+
+# =============================================================================
+# Password Reset Endpoints
+# =============================================================================
+import hashlib
+import secrets
+from app.db.models import PasswordResetToken
+from app.schemas.user import ForgotPasswordRequest, ResetPasswordRequest
+from app.utils.email import send_password_reset_email
+
+
+@router.post("/forgot-password", status_code=status.HTTP_200_OK)
+async def forgot_password(
+    body: ForgotPasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Request a password-reset email.
+
+    Always returns 200 to prevent email enumeration.
+    If the email exists, a reset link is sent via Brevo.
+    """
+    client_ip = get_client_ip(request)
+    user_agent = request.headers.get("User-Agent")
+
+    user = UserCRUD.get_by_email(db, body.email)
+    if not user:
+        # Return same message to prevent email enumeration
+        logger.info(f"Password reset requested for non-existent email: {body.email}")
+        return {"message": "If an account with that email exists, a reset link has been sent."}
+
+    # Reject OAuth-only accounts (no password to reset)
+    if user.auth_provider != "email":
+        logger.info(f"Password reset ignored for OAuth user: {body.email}")
+        return {
+            "message": "This account uses Google Sign-In. Please sign in with Google instead.",
+            "oauth_account": True
+        }
+
+    # Invalidate any previous unused tokens for this user
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id,
+        PasswordResetToken.used == False,  # noqa: E712
+    ).update({"used": True})
+    db.commit()
+
+    # Generate a secure random token and store its SHA-256 hash
+    raw_token = secrets.token_urlsafe(48)
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+    expires_at = datetime.now(timezone.utc) + timedelta(
+        minutes=settings.password_reset_expire_minutes
+    )
+
+    reset_entry = PasswordResetToken(
+        user_id=user.id,
+        token_hash=token_hash,
+        expires_at=expires_at,
+    )
+    db.add(reset_entry)
+    db.commit()
+
+    # Build the reset link (frontend route)
+    reset_link = f"{settings.app_url}/reset-password?token={raw_token}"
+
+    # Send email (non-blocking failure — user still gets generic 200)
+    email_sent = send_password_reset_email(
+        to_email=user.email,
+        to_name=user.full_name or "",
+        reset_link=reset_link,
+    )
+
+    # Audit log
+    AuditLogger.log_event(
+        db=db,
+        event_type="password_reset_requested",
+        event_category="authentication",
+        severity="info",
+        user_id=user.id,
+        ip_address=client_ip,
+        user_agent=user_agent,
+        details={"email_sent": email_sent},
+        success=email_sent,
+        force_commit=True,
+    )
+
+    return {"message": "If an account with that email exists, a reset link has been sent."}
+
+
+@router.post("/reset-password", status_code=status.HTTP_200_OK)
+async def reset_password(
+    body: ResetPasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Consume a password-reset token and set a new password.
+    """
+    client_ip = get_client_ip(request)
+    user_agent = request.headers.get("User-Agent")
+
+    # Hash the incoming token to compare with stored hash
+    token_hash = hashlib.sha256(body.token.encode()).hexdigest()
+
+    reset_entry = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token_hash == token_hash,
+        PasswordResetToken.used == False,  # noqa: E712
+    ).first()
+
+    if not reset_entry or reset_entry.expires_at < datetime.now(timezone.utc):
+        AuditLogger.log_event(
+            db=db,
+            event_type="password_reset_failed",
+            event_category="authentication",
+            severity="warning",
+            ip_address=client_ip,
+            user_agent=user_agent,
+            details={"reason": "invalid_or_expired_token"},
+            success=False,
+            force_commit=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token. Please request a new one.",
+        )
+
+    # Validate new password strength
+    is_valid, error_msg = validate_password_strength(body.new_password)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_msg,
+        )
+
+    # Update the user's password
+    user = UserCRUD.get_by_id(db, reset_entry.user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User account not found.",
+        )
+
+    UserCRUD.update_password(db, user, body.new_password)
+
+    # Mark token as used
+    reset_entry.used = True
+    db.commit()
+
+    # Audit log
+    AuditLogger.log_event(
+        db=db,
+        event_type="password_reset_success",
+        event_category="authentication",
+        severity="info",
+        user_id=user.id,
+        ip_address=client_ip,
+        user_agent=user_agent,
+        success=True,
+        force_commit=True,
+    )
+
+    logger.info(f"Password reset completed for user {user.email}")
+    return {"message": "Password has been reset successfully. You can now sign in."}

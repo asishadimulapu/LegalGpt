@@ -59,6 +59,9 @@ export async function sendChatMessage(query, sessionId = null) {
 
         clearTimeout(timeoutId);
 
+        if (response.status === 401) {
+            handleSessionExpired();
+        }
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.detail || `Server error: ${response.status}`);
@@ -122,6 +125,7 @@ export async function getChatSession(sessionId) {
         });
 
         if (!response.ok) {
+            if (response.status === 401) { handleSessionExpired(); return null; }
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.detail || 'Failed to fetch session');
         }
@@ -149,6 +153,7 @@ export async function deleteChatSession(sessionId) {
         });
 
         if (!response.ok) {
+            if (response.status === 401) { handleSessionExpired(); return null; }
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.detail || 'Failed to delete session');
         }
@@ -240,6 +245,48 @@ export async function loginUser(email, password) {
 }
 
 /**
+ * Request a password reset email
+ */
+export async function forgotPassword(email) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/auth/forgot-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to send reset email');
+        }
+        return await response.json();
+    } catch (error) {
+        if (error.name === 'TypeError') throw new Error('Unable to connect to server');
+        throw error;
+    }
+}
+
+/**
+ * Reset password using token from email link
+ */
+export async function resetPassword(token, newPassword) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/auth/reset-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, new_password: newPassword }),
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to reset password');
+        }
+        return await response.json();
+    } catch (error) {
+        if (error.name === 'TypeError') throw new Error('Unable to connect to server');
+        throw error;
+    }
+}
+
+/**
  * Upload a file for document analysis
  */
 export async function uploadFile(file) {
@@ -256,6 +303,7 @@ export async function uploadFile(file) {
         });
 
         if (!response.ok) {
+            if (response.status === 401) { handleSessionExpired(); return null; }
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.detail || 'File upload failed');
         }
@@ -305,6 +353,9 @@ export async function sendChatWithFile(query, fileContext, sessionId = null, doc
 
         clearTimeout(timeoutId);
 
+        if (response.status === 401) {
+            handleSessionExpired();
+        }
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.detail || `Server error: ${response.status}`);
@@ -368,6 +419,8 @@ export default {
     checkHealth,
     registerUser,
     loginUser,
+    forgotPassword,
+    resetPassword,
     fetchCurrentUser,
     uploadFile,
     sendChatWithFile,
@@ -423,6 +476,7 @@ export async function updateUserProfile(data) {
             body: JSON.stringify(data),
         });
         if (!response.ok) {
+            if (response.status === 401) { handleSessionExpired(); return null; }
             const err = await response.json().catch(() => ({}));
             throw new Error(err.detail || 'Failed to update profile');
         }
@@ -487,6 +541,7 @@ export async function clearUserMemories() {
             headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         });
         if (!response.ok) {
+            if (response.status === 401) { handleSessionExpired(); return null; }
             const err = await response.json().catch(() => ({}));
             throw new Error(err.detail || 'Failed to clear memories');
         }
@@ -507,6 +562,7 @@ export async function exportUserData() {
             headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         });
         if (!response.ok) {
+            if (response.status === 401) { handleSessionExpired(); return null; }
             const err = await response.json().catch(() => ({}));
             throw new Error(err.detail || 'Failed to export data');
         }
@@ -527,6 +583,7 @@ export async function deleteUserAccount() {
             headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         });
         if (!response.ok) {
+            if (response.status === 401) { handleSessionExpired(); return null; }
             const err = await response.json().catch(() => ({}));
             throw new Error(err.detail || 'Failed to delete account');
         }

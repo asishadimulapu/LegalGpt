@@ -109,6 +109,14 @@ class Settings(BaseSettings):
     password_require_lowercase: bool = True
     password_require_digit: bool = True
     password_require_special: bool = True
+
+    # -------------------------------------------------------------------------
+    # Brevo (Sendinblue) Transactional Email
+    # -------------------------------------------------------------------------
+    brevo_api_key: str = ""  # Set in .env
+    support_email: str = "support@law-gpt.app"
+    support_email_name: str = "LawGPT Support"
+    password_reset_expire_minutes: int = 30
     
     @property
     def get_cors_origins(self) -> list:

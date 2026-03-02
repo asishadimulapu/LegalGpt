@@ -92,11 +92,12 @@ async def get_profile(
 
     total_messages = 0
     if total_sessions > 0:
-        session_ids = [s.id for s in db.query(ChatSession.id).filter(
+        # Use subquery instead of loading all IDs into Python memory
+        session_id_subq = db.query(ChatSession.id).filter(
             ChatSession.user_id == user.id
-        ).all()]
+        ).subquery()
         total_messages = db.query(func.count(ChatMessage.id)).filter(
-            ChatMessage.session_id.in_(session_ids),
+            ChatMessage.session_id.in_(session_id_subq),
             ChatMessage.role == MessageRole.USER,
         ).scalar() or 0
 
@@ -158,14 +159,15 @@ async def get_stats(
         ChatSession.user_id == user.id
     ).scalar() or 0
 
-    session_ids = [s.id for s in db.query(ChatSession.id).filter(
+    # Use subquery instead of loading all IDs into Python memory
+    session_id_subq = db.query(ChatSession.id).filter(
         ChatSession.user_id == user.id
-    ).all()]
+    ).subquery()
 
     total_messages = 0
-    if session_ids:
+    if total_sessions > 0:
         total_messages = db.query(func.count(ChatMessage.id)).filter(
-            ChatMessage.session_id.in_(session_ids),
+            ChatMessage.session_id.in_(session_id_subq),
             ChatMessage.role == MessageRole.USER,
         ).scalar() or 0
 
@@ -261,7 +263,7 @@ async def delete_account(
     Requires current password for local users, or explicit confirm flag for OAuth users.
     This action is irreversible.
     """
-    is_local_user = bool(user.password_hash)
+    is_local_user = bool(user.hashed_password)
 
     if is_local_user:
         # Local users must verify their password
@@ -270,7 +272,7 @@ async def delete_account(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Current password is required to delete a local account.",
             )
-        if not verify_password(body.current_password, user.password_hash):
+        if not verify_password(body.current_password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Incorrect password. Account deletion aborted.",
