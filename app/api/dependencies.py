@@ -7,7 +7,7 @@ Includes authentication, database sessions, and service instances.
 from typing import Optional, Generator
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,7 @@ from app.db.database import get_db
 from app.db.models import User
 from app.db.crud import UserCRUD
 from app.utils.auth import decode_access_token
+from app.utils.cookies import COOKIE_NAME
 from app.core.rag_pipeline import get_rag_pipeline, RAGPipeline
 from app.core.vector_store import get_vector_store, VectorStoreManager
 
@@ -22,7 +23,23 @@ from app.core.vector_store import get_vector_store, VectorStoreManager
 security = HTTPBearer(auto_error=False)
 
 
+def _extract_token(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials],
+) -> Optional[str]:
+    """
+    Extract JWT token — prefer Authorization header, fall back to HttpOnly cookie.
+    This allows the web frontend to use cookies while mobile apps keep using
+    the Authorization header.
+    """
+    if credentials:
+        return credentials.credentials
+    # Fallback: HttpOnly cookie
+    return request.cookies.get(COOKIE_NAME)
+
+
 async def get_current_user_optional(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
 ) -> Optional[User]:
@@ -30,17 +47,12 @@ async def get_current_user_optional(
     Get current user if authenticated, None otherwise.
     Use this for endpoints that work with or without authentication.
     
-    Args:
-        credentials: JWT token from Authorization header
-        db: Database session
-        
-    Returns:
-        User if authenticated, None otherwise
+    Checks Authorization header first, then falls back to HttpOnly cookie.
     """
-    if not credentials:
+    token = _extract_token(request, credentials)
+    if not token:
         return None
     
-    token = credentials.credentials
     payload = decode_access_token(token)
     
     if not payload:
@@ -58,6 +70,7 @@ async def get_current_user_optional(
 
 
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ) -> User:
@@ -65,24 +78,16 @@ async def get_current_user(
     Get current authenticated user.
     Raises 401 if not authenticated.
     
-    Args:
-        credentials: JWT token from Authorization header
-        db: Database session
-        
-    Returns:
-        User: Authenticated user
-        
-    Raises:
-        HTTPException: 401 if not authenticated
+    Checks Authorization header first, then falls back to HttpOnly cookie.
     """
-    if not credentials:
+    token = _extract_token(request, credentials)
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
             headers={"WWW-Authenticate": "Bearer"}
         )
     
-    token = credentials.credentials
     payload = decode_access_token(token)
     
     if not payload:

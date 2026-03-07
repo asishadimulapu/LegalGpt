@@ -91,6 +91,13 @@ class User(Base):
         nullable=False,
         comment="Admin privileges flag"
     )
+    email_verified = Column(
+        Boolean,
+        default=False,
+        nullable=False,
+        server_default="false",
+        comment="Whether the user has verified their email address"
+    )
     created_at = Column(
         DateTime, 
         default=_utcnow, 

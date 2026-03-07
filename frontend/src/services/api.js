@@ -1,6 +1,12 @@
 /**
  * API Service Module
  * Handles all communication with the FastAPI backend
+ *
+ * Auth strategy:
+ *   - Web: HttpOnly cookie set by the backend (credentials: 'include')
+ *   - The Authorization header is no longer sent from the browser.
+ *   - User profile data (email, name, role) is stored in localStorage
+ *     for UI purposes only — the JWT itself never touches JS.
  */
 
 // Use environment variable in production, fallback to localhost for development
@@ -8,8 +14,30 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
     (import.meta.env.PROD ? '' : 'http://localhost:8000');
 
 /**
- * Handle 401 responses globally — clear expired session and notify app
+ * Handle 401 responses globally — try a silent token refresh first,
+ * and only expire the session if the refresh also fails.
  */
+let _refreshPromise = null;
+
+async function tryRefreshToken() {
+    // Deduplicate concurrent refresh attempts
+    if (_refreshPromise) return _refreshPromise;
+    _refreshPromise = (async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+                method: 'POST',
+                credentials: 'include',
+            });
+            return res.ok;
+        } catch {
+            return false;
+        } finally {
+            _refreshPromise = null;
+        }
+    })();
+    return _refreshPromise;
+}
+
 function handleSessionExpired() {
     const saved = localStorage.getItem('LawGPT_user');
     if (saved) {
@@ -19,18 +47,31 @@ function handleSessionExpired() {
     }
 }
 
-
 /**
- * Get auth headers if user is logged in
+ * Wrapper around fetch that automatically retries once on 401 after
+ * refreshing the access token.
  */
-function getAuthHeaders() {
-    const saved = localStorage.getItem('LawGPT_user');
-    if (saved) {
-        const user = JSON.parse(saved);
-        if (user.token) {
-            return { 'Authorization': `Bearer ${user.token}` };
+async function authedFetch(url, options = {}) {
+    const opts = { ...options, credentials: 'include' };
+    let response = await fetch(url, opts);
+    if (response.status === 401) {
+        const refreshed = await tryRefreshToken();
+        if (refreshed) {
+            response = await fetch(url, opts);
+        }
+        if (response.status === 401) {
+            handleSessionExpired();
         }
     }
+    return response;
+}
+
+
+/**
+ * Get auth headers — now returns empty since cookies handle auth.
+ * Kept for backward compatibility with any code that spreads it.
+ */
+function getAuthHeaders() {
     return {};
 }
 
@@ -44,7 +85,7 @@ export async function sendChatMessage(query, sessionId = null) {
     const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
 
     try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/chat`, {
+        const response = await authedFetch(`${API_BASE_URL}/api/v1/chat`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -58,10 +99,6 @@ export async function sendChatMessage(query, sessionId = null) {
         });
 
         clearTimeout(timeoutId);
-
-        if (response.status === 401) {
-            handleSessionExpired();
-        }
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.detail || `Server error: ${response.status}`);
@@ -86,7 +123,7 @@ export async function sendChatMessage(query, sessionId = null) {
  */
 export async function getChatSessions() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/chat/sessions`, {
+        const response = await authedFetch(`${API_BASE_URL}/api/v1/chat/sessions`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -116,7 +153,7 @@ export async function getChatSessions() {
  */
 export async function getChatSession(sessionId) {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/chat/sessions/${sessionId}`, {
+        const response = await authedFetch(`${API_BASE_URL}/api/v1/chat/sessions/${sessionId}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -125,7 +162,7 @@ export async function getChatSession(sessionId) {
         });
 
         if (!response.ok) {
-            if (response.status === 401) { handleSessionExpired(); return null; }
+            if (response.status === 401) { return null; }
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.detail || 'Failed to fetch session');
         }
@@ -144,7 +181,7 @@ export async function getChatSession(sessionId) {
  */
 export async function deleteChatSession(sessionId) {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/chat/sessions/${sessionId}`, {
+        const response = await authedFetch(`${API_BASE_URL}/api/v1/chat/sessions/${sessionId}`, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json',
@@ -153,7 +190,7 @@ export async function deleteChatSession(sessionId) {
         });
 
         if (!response.ok) {
-            if (response.status === 401) { handleSessionExpired(); return null; }
+            if (response.status === 401) { return null; }
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.detail || 'Failed to delete session');
         }
@@ -172,7 +209,7 @@ export async function deleteChatSession(sessionId) {
  */
 export async function checkHealth() {
     try {
-        const response = await fetch(`${API_BASE_URL}/health`);
+        const response = await fetch(`${API_BASE_URL}/health`, { credentials: 'include' });
         if (!response.ok) throw new Error('Backend is not healthy');
         return await response.json();
     } catch (error) {
@@ -190,6 +227,7 @@ export async function registerUser(name, email, password) {
     try {
         const response = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
             },
@@ -221,6 +259,7 @@ export async function loginUser(email, password) {
     try {
         const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
             },
@@ -251,6 +290,7 @@ export async function forgotPassword(email) {
     try {
         const response = await fetch(`${API_BASE_URL}/api/v1/auth/forgot-password`, {
             method: 'POST',
+            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email }),
         });
@@ -272,6 +312,7 @@ export async function resetPassword(token, newPassword) {
     try {
         const response = await fetch(`${API_BASE_URL}/api/v1/auth/reset-password`, {
             method: 'POST',
+            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ token, new_password: newPassword }),
         });
@@ -287,6 +328,20 @@ export async function resetPassword(token, newPassword) {
 }
 
 /**
+ * Logout — clears server-side HttpOnly cookie
+ */
+export async function logoutUser() {
+    try {
+        await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
+            method: 'POST',
+            credentials: 'include',
+        });
+    } catch {
+        // Ignore network errors on logout — cookie may already be gone
+    }
+}
+
+/**
  * Upload a file for document analysis
  */
 export async function uploadFile(file) {
@@ -294,7 +349,7 @@ export async function uploadFile(file) {
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await fetch(`${API_BASE_URL}/api/v1/upload`, {
+        const response = await authedFetch(`${API_BASE_URL}/api/v1/upload`, {
             method: 'POST',
             headers: {
                 ...getAuthHeaders(),
@@ -303,7 +358,7 @@ export async function uploadFile(file) {
         });
 
         if (!response.ok) {
-            if (response.status === 401) { handleSessionExpired(); return null; }
+            if (response.status === 401) { return null; }
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.detail || 'File upload failed');
         }
@@ -341,7 +396,7 @@ export async function sendChatWithFile(query, fileContext, sessionId = null, doc
         }
 
         // Use the hybrid document analysis endpoint
-        const response = await fetch(`${API_BASE_URL}/api/v1/upload/analyze`, {
+        const response = await authedFetch(`${API_BASE_URL}/api/v1/upload/analyze`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -352,10 +407,6 @@ export async function sendChatWithFile(query, fileContext, sessionId = null, doc
         });
 
         clearTimeout(timeoutId);
-
-        if (response.status === 401) {
-            handleSessionExpired();
-        }
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.detail || `Server error: ${response.status}`);
@@ -399,13 +450,12 @@ export async function sendChatWithFile(query, fileContext, sessionId = null, doc
 
 
 /**
- * Fetch current user profile (includes is_superuser for admin access)
+ * Fetch current user profile (includes is_superuser for admin access).
+ * Relies on the HttpOnly cookie for auth.
  */
 export async function fetchCurrentUser() {
-    const headers = getAuthHeaders();
-    if (!headers.Authorization) return null;
     try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, { headers });
+        const response = await authedFetch(`${API_BASE_URL}/api/v1/auth/me`, {});
         if (!response.ok) return null;
         return await response.json();
     } catch {
@@ -414,14 +464,26 @@ export async function fetchCurrentUser() {
 }
 
 
+/**
+ * Silently refresh the access token by calling the refresh endpoint.
+ * Used by AuthContext to keep the session alive while the tab is open.
+ * @returns {Promise<boolean>} true if refresh succeeded
+ */
+export async function silentRefresh() {
+    return tryRefreshToken();
+}
+
+
 export default {
     sendChatMessage,
     checkHealth,
     registerUser,
     loginUser,
+    logoutUser,
     forgotPassword,
     resetPassword,
     fetchCurrentUser,
+    silentRefresh,
     uploadFile,
     sendChatWithFile,
     getChatSessions,
@@ -446,13 +508,12 @@ export default {
  */
 export async function getUserProfile() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/profile`, {
+        const response = await authedFetch(`${API_BASE_URL}/api/v1/profile`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         });
         if (!response.ok) {
             if (response.status === 401) {
-                handleSessionExpired();
                 return null;
             }
             const err = await response.json().catch(() => ({}));
@@ -470,13 +531,13 @@ export async function getUserProfile() {
  */
 export async function updateUserProfile(data) {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/profile`, {
+        const response = await authedFetch(`${API_BASE_URL}/api/v1/profile`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
             body: JSON.stringify(data),
         });
         if (!response.ok) {
-            if (response.status === 401) { handleSessionExpired(); return null; }
+            if (response.status === 401) { return null; }
             const err = await response.json().catch(() => ({}));
             throw new Error(err.detail || 'Failed to update profile');
         }
@@ -492,7 +553,7 @@ export async function updateUserProfile(data) {
  */
 export async function getUserStats() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/profile/stats`, {
+        const response = await authedFetch(`${API_BASE_URL}/api/v1/profile/stats`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         });
@@ -515,7 +576,7 @@ export async function getUserMemories(memoryType = null, limit = 20) {
     try {
         let url = `${API_BASE_URL}/api/v1/profile/memories?limit=${limit}`;
         if (memoryType) url += `&memory_type=${memoryType}`;
-        const response = await fetch(url, {
+        const response = await authedFetch(url, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         });
@@ -536,12 +597,12 @@ export async function getUserMemories(memoryType = null, limit = 20) {
  */
 export async function clearUserMemories() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/profile/memories`, {
+        const response = await authedFetch(`${API_BASE_URL}/api/v1/profile/memories`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         });
         if (!response.ok) {
-            if (response.status === 401) { handleSessionExpired(); return null; }
+            if (response.status === 401) { return null; }
             const err = await response.json().catch(() => ({}));
             throw new Error(err.detail || 'Failed to clear memories');
         }
@@ -557,12 +618,12 @@ export async function clearUserMemories() {
  */
 export async function exportUserData() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/profile/export`, {
+        const response = await authedFetch(`${API_BASE_URL}/api/v1/profile/export`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         });
         if (!response.ok) {
-            if (response.status === 401) { handleSessionExpired(); return null; }
+            if (response.status === 401) { return null; }
             const err = await response.json().catch(() => ({}));
             throw new Error(err.detail || 'Failed to export data');
         }
@@ -578,12 +639,12 @@ export async function exportUserData() {
  */
 export async function deleteUserAccount() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/v1/profile/delete-account`, {
+        const response = await authedFetch(`${API_BASE_URL}/api/v1/profile/delete-account`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         });
         if (!response.ok) {
-            if (response.status === 401) { handleSessionExpired(); return null; }
+            if (response.status === 401) { return null; }
             const err = await response.json().catch(() => ({}));
             throw new Error(err.detail || 'Failed to delete account');
         }

@@ -2,7 +2,7 @@
  * QueryAnalytics — Query volume charts, latency stats, and query log table.
  */
 import React, { useState, useEffect } from 'react';
-import { Search, Zap, CheckCircle } from 'lucide-react';
+import { Search, Zap, CheckCircle, Lock } from 'lucide-react';
 import { getQueryAnalytics, getQueryLogs } from '../../services/adminApi';
 
 export default function QueryAnalytics() {
@@ -139,7 +139,10 @@ export default function QueryAnalytics() {
                         {logs.logs.map((log) => (
                             <tr key={log.id}>
                                 <td style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {log.query_text}
+                                    <span className="admin-badge encrypted">
+                                        <Lock size={12} style={{ marginRight: 4 }} />
+                                        User Private
+                                    </span>
                                 </td>
                                 <td>{log.user_email || '—'}</td>
                                 <td>

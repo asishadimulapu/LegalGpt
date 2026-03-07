@@ -29,9 +29,11 @@ import {
     Rocket,
     MessageCircle
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import '../styles/landing.css';
 
-function Landing({ onTryNow, onAuthClick }) {
+function Landing() {
+    const { openAuth: onAuthClick } = useAuth();
     const navigate = useNavigate();
     const [isVisible, setIsVisible] = useState(false);
 

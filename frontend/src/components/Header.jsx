@@ -8,14 +8,14 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Scale, Menu, X, LogOut, User, MessageCircle } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import '../styles/header.css';
 
-function Header({ onAuthClick, user, onLogout }) {
+function Header() {
+    const { user, isAuthenticated, openAuth: onAuthClick, logout: onLogout } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
     const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
-
-    const isAuthenticated = !!user;
 
     // Handle smooth-scroll for landing page sections
     const handleSectionClick = (e, sectionId) => {

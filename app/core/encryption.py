@@ -13,11 +13,13 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.backends import default_backend
+from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.fernet import Fernet
 import os
 import base64
 import hmac
 import hashlib
+import tempfile
 from typing import Tuple, Dict, Optional
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -67,21 +69,73 @@ class ServerEncryptionManager:
         self._load_or_generate_server_keys()
     
     def _load_or_generate_server_keys(self):
-        """Load or generate server's RSA key pair for key wrapping."""
+        """Load or generate server's RSA key pair for key wrapping.
+
+        The private key is encrypted at rest using a passphrase derived from
+        the application's ``encryption_key`` (via PBKDF2).  When no encryption
+        key is available the key is saved unencrypted with a warning.
+        """
         key_dir = Path("keys")
         key_dir.mkdir(exist_ok=True, mode=0o700)
         
         private_key_path = key_dir / "server_private.pem"
         public_key_path = key_dir / "server_public.pem"
+
+        # Derive a stable passphrase from the encryption key (via PBKDF2)
+        _passphrase: Optional[bytes] = None
+        if self.metadata_key:
+            kdf = PBKDF2HMAC(
+                algorithm=hashes.SHA256(),
+                length=32,
+                salt=b"lawgpt-rsa-passphrase-v1",
+                iterations=PBKDF2_ITERATIONS,
+            )
+            _passphrase = kdf.derive(self.metadata_key)
         
         if private_key_path.exists():
-            # Load existing keys
-            with open(private_key_path, "rb") as f:
+            # Load existing keys — try encrypted first, fall back to unencrypted
+            pem_data = private_key_path.read_bytes()
+            try:
                 self.private_key = serialization.load_pem_private_key(
-                    f.read(),
-                    password=None,
-                    backend=self.backend
+                    pem_data,
+                    password=_passphrase,
+                    backend=self.backend,
                 )
+            except (TypeError, ValueError, UnsupportedAlgorithm):
+                # Key was saved without encryption (legacy) — load unencrypted
+                self.private_key = serialization.load_pem_private_key(
+                    pem_data,
+                    password=None,
+                    backend=self.backend,
+                )
+                # Re-save encrypted (atomic write)
+                if _passphrase:
+                    pem_bytes = self.private_key.private_bytes(
+                        encoding=serialization.Encoding.PEM,
+                        format=serialization.PrivateFormat.PKCS8,
+                        encryption_algorithm=serialization.BestAvailableEncryption(
+                            _passphrase
+                        ),
+                    )
+                    tmp_fd, tmp_path = tempfile.mkstemp(dir=str(key_dir))
+                    fd_closed = False
+                    try:
+                        os.write(tmp_fd, pem_bytes)
+                        if hasattr(os, 'fchmod'):
+                            os.fchmod(tmp_fd, 0o600)
+                        os.close(tmp_fd)
+                        fd_closed = True
+                        if not hasattr(os, 'fchmod'):
+                            os.chmod(tmp_path, 0o600)
+                        os.replace(tmp_path, str(private_key_path))
+                    except Exception:
+                        if not fd_closed:
+                            os.close(tmp_fd)
+                        if os.path.exists(tmp_path):
+                            os.unlink(tmp_path)
+                        raise
+                    logger.info("✓ Re-encrypted existing RSA private key at rest")
+
             with open(public_key_path, "rb") as f:
                 self.public_key = serialization.load_pem_public_key(
                     f.read(),
@@ -97,14 +151,34 @@ class ServerEncryptionManager:
             )
             self.public_key = self.private_key.public_key()
             
-            # Save keys securely
-            with open(private_key_path, "wb") as f:
-                f.write(self.private_key.private_bytes(
-                    encoding=serialization.Encoding.PEM,
-                    format=serialization.PrivateFormat.PKCS8,
-                    encryption_algorithm=serialization.NoEncryption()
-                ))
-            os.chmod(private_key_path, 0o600)
+            # Save private key — encrypted when passphrase is available (atomic write)
+            enc_algo = (
+                serialization.BestAvailableEncryption(_passphrase)
+                if _passphrase
+                else serialization.NoEncryption()
+            )
+            pem_bytes = self.private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=enc_algo,
+            )
+            tmp_fd, tmp_path = tempfile.mkstemp(dir=str(key_dir))
+            fd_closed = False
+            try:
+                os.write(tmp_fd, pem_bytes)
+                if hasattr(os, 'fchmod'):
+                    os.fchmod(tmp_fd, 0o600)
+                os.close(tmp_fd)
+                fd_closed = True
+                os.replace(tmp_path, str(private_key_path))
+                if not hasattr(os, 'fchmod'):
+                    os.chmod(private_key_path, 0o600)
+            except Exception:
+                if not fd_closed:
+                    os.close(tmp_fd)
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+                raise
             
             with open(public_key_path, "wb") as f:
                 f.write(self.public_key.public_bytes(

@@ -7,7 +7,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
-from jose import jwt, JWTError
+import jwt  # PyJWT — actively maintained replacement for python-jose
+from jwt import InvalidTokenError
 import bcrypt
 import logging
 import re
@@ -151,8 +152,59 @@ def decode_access_token(token: str) -> Optional[dict]:
             algorithms=[settings.jwt_algorithm]
         )
         return payload
-    except JWTError as e:
+    except InvalidTokenError as e:
         logger.warning(f"JWT decode error: {e}")
+        return None
+
+
+def create_refresh_token(
+    subject: str | UUID,
+    expires_delta: Optional[timedelta] = None,
+) -> str:
+    """
+    Create a long-lived refresh token.
+
+    The refresh token has type="refresh" in its payload so it cannot be
+    confused with an access token.
+    """
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(
+            days=settings.refresh_token_expire_days
+        )
+
+    to_encode = {
+        "sub": str(subject),
+        "exp": expire,
+        "iat": datetime.now(timezone.utc),
+        "type": "refresh",
+    }
+
+    return jwt.encode(
+        to_encode,
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+
+
+def decode_refresh_token(token: str) -> Optional[dict]:
+    """
+    Decode a refresh token.  Returns the payload **only** if the token's
+    ``type`` claim is ``"refresh"``; returns ``None`` otherwise.
+    """
+    try:
+        payload = jwt.decode(
+            token,
+            settings.jwt_secret_key,
+            algorithms=[settings.jwt_algorithm],
+        )
+        if payload.get("type") != "refresh":
+            logger.warning("Token presented as refresh but type != 'refresh'")
+            return None
+        return payload
+    except InvalidTokenError as e:
+        logger.warning(f"Refresh-token decode error: {e}")
         return None
 
 

@@ -1,22 +1,46 @@
 /**
  * Admin API Service
  * Handles all communication with admin-only backend endpoints.
+ * Auth is via HttpOnly cookie (credentials: 'include').
+ * On 401, attempts a silent token refresh before expiring session.
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
     (import.meta.env.PROD ? '' : 'http://localhost:8000');
 
 function getAuthHeaders() {
-    try {
-        const saved = localStorage.getItem('LawGPT_user');
-        if (saved) {
-            const user = JSON.parse(saved);
-            if (user?.token) {
-                return { 'Authorization': `Bearer ${user.token}` };
-            }
-        }
-    } catch { }
+    // Cookie-based auth — no Authorization header needed.
     return {};
+}
+
+/** Deduplicated token refresh (shared promise). */
+let _adminRefreshPromise = null;
+async function _tryRefresh() {
+    if (_adminRefreshPromise) return _adminRefreshPromise;
+    _adminRefreshPromise = (async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+                method: 'POST',
+                credentials: 'include',
+            });
+            return res.ok;
+        } catch { return false; }
+        finally { _adminRefreshPromise = null; }
+    })();
+    return _adminRefreshPromise;
+}
+
+/**
+ * Wrapper: fetch with credentials + auto-retry on 401 after refresh.
+ */
+async function adminFetch(url, opts = {}) {
+    const options = { ...opts, credentials: 'include' };
+    let res = await fetch(url, options);
+    if (res.status === 401) {
+        const ok = await _tryRefresh();
+        if (ok) res = await fetch(url, options);
+    }
+    return res;
 }
 
 async function handleResponse(res) {
@@ -48,7 +72,7 @@ async function handleResponse(res) {
 // Dashboard
 // =============================================================================
 export async function getDashboardStats() {
-    const res = await fetch(`${API_BASE_URL}/api/v1/admin/dashboard`, {
+    const res = await adminFetch(`${API_BASE_URL}/api/v1/admin/dashboard`, {
         headers: { ...getAuthHeaders() },
     });
     return handleResponse(res);
@@ -63,21 +87,21 @@ export async function getUsers(page = 1, perPage = 20, search = '', provider = '
     if (provider) params.append('provider', provider);
     if (activeOnly !== null) params.append('active_only', activeOnly);
 
-    const res = await fetch(`${API_BASE_URL}/api/v1/admin/users?${params}`, {
+    const res = await adminFetch(`${API_BASE_URL}/api/v1/admin/users?${params}`, {
         headers: { ...getAuthHeaders() },
     });
     return handleResponse(res);
 }
 
 export async function getUserDetail(userId) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/admin/users/${encodeURIComponent(userId)}`, {
+    const res = await adminFetch(`${API_BASE_URL}/api/v1/admin/users/${encodeURIComponent(userId)}`, {
         headers: { ...getAuthHeaders() },
     });
     return handleResponse(res);
 }
 
 export async function updateUser(userId, updates) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/admin/users/${encodeURIComponent(userId)}`, {
+    const res = await adminFetch(`${API_BASE_URL}/api/v1/admin/users/${encodeURIComponent(userId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify(updates),
@@ -86,7 +110,7 @@ export async function updateUser(userId, updates) {
 }
 
 export async function deleteUser(userId) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/admin/users/${encodeURIComponent(userId)}`, {
+    const res = await adminFetch(`${API_BASE_URL}/api/v1/admin/users/${encodeURIComponent(userId)}`, {
         method: 'DELETE',
         headers: { ...getAuthHeaders() },
     });
@@ -97,14 +121,14 @@ export async function deleteUser(userId) {
 // Query Analytics
 // =============================================================================
 export async function getQueryAnalytics(days = 30) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/admin/queries/analytics?days=${days}`, {
+    const res = await adminFetch(`${API_BASE_URL}/api/v1/admin/queries/analytics?days=${days}`, {
         headers: { ...getAuthHeaders() },
     });
     return handleResponse(res);
 }
 
 export async function getQueryLogs(page = 1, perPage = 20) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/admin/queries?page=${page}&per_page=${perPage}`, {
+    const res = await adminFetch(`${API_BASE_URL}/api/v1/admin/queries?page=${page}&per_page=${perPage}`, {
         headers: { ...getAuthHeaders() },
     });
     return handleResponse(res);
@@ -117,14 +141,14 @@ export async function getDocuments(page = 1, perPage = 20, source = '') {
     const params = new URLSearchParams({ page, per_page: perPage });
     if (source) params.append('source', source);
 
-    const res = await fetch(`${API_BASE_URL}/api/v1/admin/documents?${params}`, {
+    const res = await adminFetch(`${API_BASE_URL}/api/v1/admin/documents?${params}`, {
         headers: { ...getAuthHeaders() },
     });
     return handleResponse(res);
 }
 
 export async function deleteDocument(docId) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/admin/documents/${encodeURIComponent(docId)}`, {
+    const res = await adminFetch(`${API_BASE_URL}/api/v1/admin/documents/${encodeURIComponent(docId)}`, {
         method: 'DELETE',
         headers: { ...getAuthHeaders() },
     });
@@ -139,7 +163,7 @@ export async function getAuditLogs(page = 1, perPage = 20, eventType = '', sever
     if (eventType) params.append('event_type', eventType);
     if (severity) params.append('severity', severity);
 
-    const res = await fetch(`${API_BASE_URL}/api/v1/admin/audit-logs?${params}`, {
+    const res = await adminFetch(`${API_BASE_URL}/api/v1/admin/audit-logs?${params}`, {
         headers: { ...getAuthHeaders() },
     });
     return handleResponse(res);
@@ -149,7 +173,7 @@ export async function getAuditLogs(page = 1, perPage = 20, eventType = '', sever
 // Settings
 // =============================================================================
 export async function getSettings() {
-    const res = await fetch(`${API_BASE_URL}/api/v1/admin/settings`, {
+    const res = await adminFetch(`${API_BASE_URL}/api/v1/admin/settings`, {
         headers: { ...getAuthHeaders() },
     });
     return handleResponse(res);

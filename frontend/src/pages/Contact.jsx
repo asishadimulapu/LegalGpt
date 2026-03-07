@@ -16,6 +16,8 @@ function Contact() {
         message: ''
     });
     const [submitted, setSubmitted] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState(null);
     const submitTimeoutRef = useRef(null);
 
     // Cleanup timeout on unmount
@@ -27,21 +29,40 @@ function Contact() {
         };
     }, []);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        // In a real application, this would send the form data to your backend
-        // Note: Avoid logging PII (formData) in production
-        setSubmitted(true);
-        
-        // Clear any existing timeout before creating a new one
-        if (submitTimeoutRef.current) {
-            clearTimeout(submitTimeoutRef.current);
+        setSubmitting(true);
+        setSubmitError(null);
+
+        try {
+            const API_URL = import.meta.env.VITE_API_URL || '';
+            const res = await fetch(`${API_URL}/api/v1/contact`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData),
+            });
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.detail || 'Failed to send message. Please try again.');
+            }
+
+            setSubmitted(true);
+
+            // Clear any existing timeout before creating a new one
+            if (submitTimeoutRef.current) {
+                clearTimeout(submitTimeoutRef.current);
+            }
+
+            submitTimeoutRef.current = setTimeout(() => {
+                setSubmitted(false);
+                setFormData({ name: '', email: '', subject: '', message: '' });
+            }, 5000);
+        } catch (err) {
+            setSubmitError(err.message);
+        } finally {
+            setSubmitting(false);
         }
-        
-        submitTimeoutRef.current = setTimeout(() => {
-            setSubmitted(false);
-            setFormData({ name: '', email: '', subject: '', message: '' });
-        }, 3000);
     };
 
     const handleChange = (e) => {
@@ -219,9 +240,17 @@ function Contact() {
                                         ></textarea>
                                     </div>
 
-                                    <button type="submit" className="btn btn-primary">
-                                        <Send size={20} /> Send Message
+                                    <button type="submit" className="btn btn-primary" disabled={submitting}>
+                                        {submitting ? (
+                                            <><span className="spinner" style={{ width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin .8s linear infinite', marginRight: 8 }} /> Sending...</>
+                                        ) : (
+                                            <><Send size={20} /> Send Message</>
+                                        )}
                                     </button>
+
+                                    {submitError && (
+                                        <p style={{ color: '#e74c3c', marginTop: 8, fontSize: 14 }}>{submitError}</p>
+                                    )}
 
                                     <p className="form-note">
                                         * Required fields. By submitting this form, you agree to our 

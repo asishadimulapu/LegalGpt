@@ -5,9 +5,11 @@
 import React from 'react';
 import { NavLink, Outlet, Navigate, Link } from 'react-router-dom';
 import { Scale, LayoutDashboard, Users, BarChart3, ArrowLeft, ShieldX } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import '../styles/admin.css';
 
-export default function AdminLayout({ user }) {
+export default function AdminLayout() {
+    const { user } = useAuth();
     // Route guard: redirect non-admins
     if (!user?.is_superuser) {
         return (

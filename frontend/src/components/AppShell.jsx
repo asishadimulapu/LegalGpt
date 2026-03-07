@@ -12,7 +12,7 @@ import { Menu, Scale } from 'lucide-react';
 import Sidebar from './Sidebar';
 import '../styles/appshell.css';
 
-function AppShell({ user, onLogout }) {
+function AppShell() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -21,7 +21,7 @@ function AppShell({ user, onLogout }) {
 
   return (
     <div className={`app-shell ${isChat ? 'shell-chat' : ''}`}>
-      <Sidebar user={user} onLogout={onLogout} compact={isChat} mobileMenuOpen={mobileMenuOpen} />
+      <Sidebar compact={isChat} mobileMenuOpen={mobileMenuOpen} />
 
       {/* Mobile top-bar (visible ≤ 768px) */}
       <div className="mobile-topbar">

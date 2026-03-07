@@ -17,8 +17,8 @@ from sqlalchemy.exc import SQLAlchemyError, OperationalError, IntegrityError
 
 from app.db.database import get_db
 from app.db.crud import UserCRUD
-from app.schemas.user import UserCreate, UserLogin, UserResponse, AdminUserResponse, Token
-from app.utils.auth import create_access_token, validate_password_strength
+from app.schemas.user import UserCreate, UserLogin, UserResponse, AdminUserResponse, Token, ForgotPasswordRequest
+from app.utils.auth import create_access_token, create_refresh_token, validate_password_strength
 from app.utils.audit import AuditLogger
 from app.utils.logging_config import get_logger
 
@@ -34,23 +34,25 @@ from urllib.parse import urlencode
 logger = get_logger(__name__)
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-# Temporary cache for mobile auth code exchange (Simple in-memory for now)
-# In production, use Redis or DB with TTL
-# Map: transfer_code -> {access_token: str, expires_at: datetime}
-_TEMP_AUTH_CODES_MAX_SIZE = 100  # Prevent unbounded growth
-temp_auth_codes = {}
+# Temporary cache for mobile auth code exchange
+# Uses Redis when available (multi-worker safe); falls back to in-memory dict.
+_TEMP_AUTH_CODES_MAX_SIZE = 100  # Limit for in-memory fallback
+_TEMP_AUTH_CODE_TTL = 60  # seconds
+temp_auth_codes = {}  # fallback dict
 _temp_auth_codes_lock = asyncio.Lock()
+
+# Redis key prefix for temp auth codes
+_REDIS_AUTH_PREFIX = "temp_auth:"
+# Redis key prefix for OAuth state CSRF tokens
+_REDIS_OAUTH_STATE_PREFIX = "oauth_state:"
+_OAUTH_STATE_TTL = 600  # 10 minutes
+# In-memory fallback for OAuth states
+_oauth_states: dict[str, float] = {}
+_oauth_states_lock = asyncio.Lock()
 
 
 async def _cleanup_expired_temp_auth_codes():
-    """
-    Remove expired entries from temp_auth_codes (lazy cleanup).
-
-    Viva Explanation:
-    - Acquires asyncio lock to prevent concurrent dict mutation
-    - Snapshots items via list() for safe iteration during cleanup
-    - Called lazily on access and before inserts to bound memory usage
-    """
+    """Remove expired entries from the in-memory fallback dict."""
     async with _temp_auth_codes_lock:
         now = datetime.now(timezone.utc)
         expired_keys = [k for k, v in list(temp_auth_codes.items()) if now > v.get("expires_at", now)]
@@ -60,26 +62,103 @@ async def _cleanup_expired_temp_auth_codes():
 
 async def _store_temp_auth_code(code: str, data: dict):
     """
-    Store a transfer code with max-size enforcement and lazy cleanup.
-
-    Viva Explanation:
-    - Acquires asyncio lock to serialize concurrent dict mutations
-    - Enforces a cap on the dict to prevent unbounded memory growth
-    - Evicts expired entries first, then entry closest to expiry if still at capacity
-    - Ensures the auth code cache stays bounded in single-instance setups
+    Store a transfer code in Redis (preferred) or in-memory dict (fallback).
+    Redis entries use a TTL so they expire automatically.
     """
+    from app.utils.redis_client import get_redis
+
+    redis = await get_redis()
+    if redis:
+        import json as _json
+        # Serialise the value; AdminUserResponse → dict
+        serialisable = {
+            "access_token": data["access_token"],
+            "user": data["user"].model_dump(mode="json") if hasattr(data["user"], "model_dump") else data["user"].__dict__,
+        }
+        await redis.setex(f"{_REDIS_AUTH_PREFIX}{code}", _TEMP_AUTH_CODE_TTL, _json.dumps(serialisable))
+        return
+
+    # ── In-memory fallback ──
     async with _temp_auth_codes_lock:
         if len(temp_auth_codes) >= _TEMP_AUTH_CODES_MAX_SIZE:
-            # Remove expired first
             now = datetime.now(timezone.utc)
             expired_keys = [k for k, v in list(temp_auth_codes.items()) if now > v.get("expires_at", now)]
             for k in expired_keys:
                 temp_auth_codes.pop(k, None)
-        # If still at capacity, evict the entry closest to expiry
         if len(temp_auth_codes) >= _TEMP_AUTH_CODES_MAX_SIZE:
-            evict_key = min(temp_auth_codes, key=lambda k: temp_auth_codes[k].get("expires_at", now))
+            evict_key = min(temp_auth_codes, key=lambda k: temp_auth_codes[k].get("expires_at", datetime.now(timezone.utc)))
             temp_auth_codes.pop(evict_key, None)
         temp_auth_codes[code] = data
+
+
+async def _get_and_delete_temp_auth_code(code: str) -> dict | None:
+    """
+    Retrieve and atomically delete a transfer code (one-time use).
+    Checks Redis first, then falls back to in-memory dict.
+    """
+    from app.utils.redis_client import get_redis
+    import json as _json
+
+    redis = await get_redis()
+    if redis:
+        key = f"{_REDIS_AUTH_PREFIX}{code}"
+        raw = await redis.getdel(key)
+        if raw:
+            return _json.loads(raw)
+        return None
+
+    # ── In-memory fallback ──
+    async with _temp_auth_codes_lock:
+        code_data = temp_auth_codes.pop(code, None)
+    if code_data and datetime.now(timezone.utc) > code_data.get("expires_at", datetime.min.replace(tzinfo=timezone.utc)):
+        return None  # expired
+    return code_data
+
+
+# ── OAuth state CSRF helpers ──────────────────────────────────────────────
+
+async def _store_oauth_state(state: str) -> None:
+    """Store an OAuth state token in Redis (preferred) or in-memory."""
+    from app.utils.redis_client import get_redis
+
+    redis = await get_redis()
+    if redis:
+        await redis.setex(f"{_REDIS_OAUTH_STATE_PREFIX}{state}", _OAUTH_STATE_TTL, "1")
+        return
+
+    async with _oauth_states_lock:
+        # Prune expired entries lazily
+        now = datetime.now(timezone.utc).timestamp()
+        expired = [k for k, exp in _oauth_states.items() if now > exp]
+        for k in expired:
+            _oauth_states.pop(k, None)
+        _oauth_states[state] = now + _OAUTH_STATE_TTL
+
+
+async def _verify_and_consume_oauth_state(state: str) -> bool:
+    """
+    Verify an OAuth state token exists and delete it (one-time use).
+    Returns True if valid, False otherwise.
+    """
+    from app.utils.redis_client import get_redis
+
+    # Extract the random part for lookup. State formats:
+    #   - plain random: "abc..."
+    #   - mobile prefix: "mobile_abc..."
+    #   - mobile with redirect: "mobile.<b64>.<random>"
+    # We store the FULL state string, so look it up as-is.
+
+    redis = await get_redis()
+    if redis:
+        key = f"{_REDIS_OAUTH_STATE_PREFIX}{state}"
+        result = await redis.getdel(key)
+        return result is not None
+
+    async with _oauth_states_lock:
+        if state in _oauth_states:
+            exp = _oauth_states.pop(state)
+            return datetime.now(timezone.utc).timestamp() <= exp
+    return False
 
 
 # Fallback audit log directory
@@ -212,6 +291,12 @@ async def register(
         # Create new user
         user = UserCRUD.create(db, user_data)
         
+        # Send email verification
+        try:
+            await _send_verification_email(user, db)
+        except Exception as verif_err:
+            logger.warning(f"Failed to send verification email: {verif_err}")
+        
         # Log successful registration (independent transaction for reliability)
         AuditLogger.log_event(
             db=db,
@@ -295,19 +380,11 @@ async def login(
 ) -> Token:
     """
     Authenticate user and return JWT token.
-    Includes audit logging for security monitoring.
-    
-    Args:
-        credentials: Login credentials (email + password)
-        request: Request object for audit logging
-        db: Database session
-        
-    Returns:
-        Token: JWT access token
-        
-    Raises:
-        HTTPException: 401 if credentials are invalid
+    Sets an HttpOnly cookie for web clients and returns the token in the
+    response body for mobile / programmatic clients.
     """
+    from fastapi.responses import JSONResponse
+    from app.utils.cookies import set_auth_cookie
     # Authenticate user
     user = UserCRUD.authenticate(db, credentials.email, credentials.password)
     
@@ -343,6 +420,13 @@ async def login(
             detail="Account is disabled"
         )
     
+    # Block unverified email accounts (OAuth users are auto-verified)
+    if not user.email_verified and user.auth_provider == "email":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email before signing in. Check your inbox for the verification link.",
+        )
+    
     # Log successful login
     AuditLogger.log_login(
         db=db,
@@ -352,34 +436,47 @@ async def login(
         success=True
     )
     
-    # Create JWT token
+    # Create JWT tokens
     access_token = create_access_token(subject=user.id)
+    refresh_token = create_refresh_token(subject=user.id)
     
-    return Token(access_token=access_token, token_type="bearer")
+    # Set HttpOnly cookies for web clients
+    from app.utils.cookies import set_refresh_cookie
+    response = JSONResponse(content={
+        "access_token": access_token,
+        "token_type": "bearer",
+    })
+    set_auth_cookie(response, access_token)
+    set_refresh_cookie(response, refresh_token)
+    return response
 
 
 
 @router.get("/me", response_model=AdminUserResponse)
 async def get_current_user_profile(
+    request: Request,
     db: Session = Depends(get_db),
-    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer(auto_error=False))
 ) -> AdminUserResponse:
     """
     Get current user's profile.
-    Requires authentication via JWT token.
-    
-    Returns:
-        UserResponse: Current user's profile
-        
-    Raises:
-        HTTPException: 401 if not authenticated or token invalid
+    Accepts JWT via Authorization header OR HttpOnly cookie.
     """
     from app.utils.auth import decode_access_token
     from app.db.crud import UserCRUD
+    from app.utils.cookies import COOKIE_NAME
     from uuid import UUID
     
-    # Decode and validate token
-    token = credentials.credentials
+    # Extract token from header or cookie
+    token = credentials.credentials if credentials else request.cookies.get(COOKIE_NAME)
+    
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
     payload = decode_access_token(token)
     
     if not payload:
@@ -424,6 +521,81 @@ async def get_current_user_profile(
         is_superuser=user.is_superuser,
         created_at=user.created_at
     )
+
+
+@router.post("/logout")
+async def logout():
+    """
+    Clear the HttpOnly auth cookie.
+    Mobile clients can simply discard the stored token.
+    """
+    from fastapi.responses import JSONResponse
+    from app.utils.cookies import clear_auth_cookie
+
+    response = JSONResponse(content={"message": "Logged out"})
+    clear_auth_cookie(response)
+    return response
+
+
+@router.post("/refresh")
+async def refresh_tokens(request: Request, db: Session = Depends(get_db)):
+    """
+    Rotate tokens: consume the refresh-token cookie and issue a fresh
+    access + refresh token pair.  Mobile clients can also POST the
+    refresh token in the JSON body ``{"refresh_token": "..."}`` when
+    cookies are not available.
+    """
+    from fastapi.responses import JSONResponse
+    from app.utils.auth import decode_refresh_token
+    from app.utils.cookies import (
+        REFRESH_COOKIE_NAME, set_auth_cookie, set_refresh_cookie, clear_auth_cookie,
+    )
+    from uuid import UUID
+
+    # Try cookie first, then JSON body
+    token = request.cookies.get(REFRESH_COOKIE_NAME)
+    if not token:
+        try:
+            body = await request.json()
+            token = body.get("refresh_token")
+        except Exception:
+            token = None
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token missing",
+        )
+
+    payload = decode_refresh_token(token)
+    if not payload:
+        # Token is invalid / expired — force full re-login
+        resp = JSONResponse(
+            status_code=401,
+            content={"detail": "Refresh token invalid or expired"},
+        )
+        clear_auth_cookie(resp)
+        return resp
+
+    user_id = payload.get("sub")
+    user = UserCRUD.get_by_id(db, UUID(user_id)) if user_id else None
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or inactive",
+        )
+
+    # Issue new token pair (rotation)
+    new_access = create_access_token(subject=user.id)
+    new_refresh = create_refresh_token(subject=user.id)
+
+    response = JSONResponse(content={
+        "access_token": new_access,
+        "token_type": "bearer",
+    })
+    set_auth_cookie(response, new_access)
+    set_refresh_cookie(response, new_refresh)
+    return response
 
 
 # =============================================================================
@@ -519,6 +691,9 @@ async def get_google_oauth_url(source: Optional[str] = None, mobile_redirect: Op
     query_string = urlencode(params)
     auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{query_string}"
     
+    # Store state for CSRF verification on callback
+    await _store_oauth_state(state)
+    
     return GoogleAuthURL(auth_url=auth_url, state=state)
 
 
@@ -548,6 +723,13 @@ async def google_oauth_callback(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Google OAuth not configured"
+        )
+    
+    # Verify the state parameter to prevent CSRF attacks
+    if not await _verify_and_consume_oauth_state(callback_data.state):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired OAuth state. Please try signing in again."
         )
     
     client_ip = get_client_ip(request)
@@ -674,6 +856,7 @@ async def google_oauth_callback(
         
         # Check if mobile flow (via state prefix)
         transfer_code = None
+        is_mobile = callback_data.state.startswith("mobile.") or callback_data.state.startswith("mobile_")
         if callback_data.state.startswith("mobile."):
             # Generate short-lived transfer code
             # We don't want to expose the JWT in the URL
@@ -691,7 +874,7 @@ async def google_oauth_callback(
                 "expires_at": datetime.now(timezone.utc) + timedelta(minutes=1)
             })
         
-        return GoogleAuthResponse(
+        auth_response = GoogleAuthResponse(
             access_token=access_token,
             user=AdminUserResponse(
                 id=user.id,
@@ -703,6 +886,18 @@ async def google_oauth_callback(
             ),
             transfer_code=transfer_code
         )
+
+        # Set HttpOnly cookie for web OAuth flow
+        if not is_mobile:
+            from fastapi.responses import JSONResponse
+            from app.utils.cookies import set_auth_cookie, set_refresh_cookie
+            web_refresh = create_refresh_token(subject=user.id)
+            response = JSONResponse(content=auth_response.model_dump(mode="json"))
+            set_auth_cookie(response, access_token)
+            set_refresh_cookie(response, web_refresh)
+            return response
+
+        return auth_response
         
     except HTTPException:
         raise
@@ -860,33 +1055,162 @@ async def exchange_transfer_code(request: ExchangeRequest):
     Viva Explanation:
     - Mobile app receives a short-lived transfer_code via deep link
     - This endpoint exchanges it for the actual JWT (one-time use)
-    - Expired entries are cleaned up lazily on access
+    - Uses Redis (multi-worker safe) with in-memory fallback
     """
-    # Lazy cleanup on every access
-    await _cleanup_expired_temp_auth_codes()
+    code_data = await _get_and_delete_temp_auth_code(request.code)
 
-    async with _temp_auth_codes_lock:
-        code_data = temp_auth_codes.get(request.code)
+    if not code_data:
+        raise HTTPException(status_code=400, detail="Invalid or expired code")
 
-        if not code_data:
-            raise HTTPException(status_code=400, detail="Invalid code")
-
-        if datetime.now(timezone.utc) > code_data["expires_at"]:
-            temp_auth_codes.pop(request.code, None)
-            raise HTTPException(status_code=400, detail="Code expired")
-
-        # One-time use: pop the code so it cannot be reused
-        temp_auth_codes.pop(request.code, None)
+    # If data came from Redis it's already a plain dict (user is a dict);
+    # if from in-memory it may be an AdminUserResponse model.
     token = code_data["access_token"]
     user = code_data["user"]
 
-    # Audit log for transfer code exchange
+    # Rebuild AdminUserResponse if user came from Redis as a dict
+    if isinstance(user, dict):
+        user = AdminUserResponse(**user)
+
     logger.info(f"Transfer code exchanged successfully for user {user.email}")
 
     return GoogleAuthResponse(
         access_token=token,
         user=user
     )
+
+
+# =============================================================================
+# Email Verification Helpers & Endpoints
+# =============================================================================
+from app.utils.email import send_email_verification
+
+_EMAIL_VERIFY_TTL = 86400  # 24 hours
+_REDIS_VERIFY_PREFIX = "email_verify:"
+_email_verify_codes: dict[str, dict] = {}  # in-memory fallback
+_email_verify_lock = asyncio.Lock()
+
+
+async def _send_verification_email(user, db: Session) -> None:
+    """Generate a verification token, store it, and send the email."""
+    raw_token = secrets.token_urlsafe(48)
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+    # Store in Redis (preferred) or in-memory
+    from app.utils.redis_client import get_redis
+    redis = await get_redis()
+    if redis:
+        await redis.setex(
+            f"{_REDIS_VERIFY_PREFIX}{token_hash}",
+            _EMAIL_VERIFY_TTL,
+            str(user.id),
+        )
+    else:
+        async with _email_verify_lock:
+            _email_verify_codes[token_hash] = {
+                "user_id": str(user.id),
+                "expires_at": datetime.now(timezone.utc) + timedelta(seconds=_EMAIL_VERIFY_TTL),
+            }
+
+    verify_link = f"{settings.app_url}/verify-email?token={raw_token}"
+    send_email_verification(
+        to_email=user.email,
+        to_name=user.full_name or "",
+        verify_link=verify_link,
+    )
+
+
+@router.get("/verify-email", status_code=status.HTTP_200_OK)
+async def verify_email(token: str, db: Session = Depends(get_db)):
+    """
+    Verify a user's email address using the token sent during registration.
+    """
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+    # Look up in Redis first
+    from app.utils.redis_client import get_redis
+    redis = await get_redis()
+    user_id_str: str | None = None
+
+    if redis:
+        raw = await redis.getdel(f"{_REDIS_VERIFY_PREFIX}{token_hash}")
+        if raw:
+            user_id_str = raw.decode() if isinstance(raw, bytes) else raw
+    else:
+        async with _email_verify_lock:
+            entry = _email_verify_codes.pop(token_hash, None)
+        if entry and datetime.now(timezone.utc) < entry["expires_at"]:
+            user_id_str = entry["user_id"]
+
+    if not user_id_str:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification link. Please register again.",
+        )
+
+    from uuid import UUID
+    user = UserCRUD.get_by_id(db, UUID(user_id_str))
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User not found.")
+
+    user.email_verified = True
+    db.commit()
+
+    logger.info(f"Email verified for user {user.email}")
+    return {"message": "Email verified successfully. You can now sign in."}
+
+
+_RESEND_RATE_PREFIX = "resend_verify_rate:"
+_RESEND_RATE_MAX = 3
+_RESEND_RATE_WINDOW = 3600
+_resend_rate_mem: dict = {}
+_resend_rate_lock = asyncio.Lock()
+
+
+async def _check_resend_rate_limit(email: str) -> bool:
+    """Return True if the email has exceeded its resend-verification rate limit."""
+    import time
+    key = f"{_RESEND_RATE_PREFIX}{email.lower()}"
+    now = time.time()
+
+    try:
+        from app.utils.redis_client import get_redis
+        redis = await get_redis()
+        if redis:
+            count = await redis.incr(key)
+            if count == 1:
+                await redis.expire(key, _RESEND_RATE_WINDOW)
+            return count > _RESEND_RATE_MAX
+    except Exception as exc:
+        logger.warning("Redis error in resend rate-limit check: %s", exc)
+
+    async with _resend_rate_lock:
+        entry = _resend_rate_mem.get(key)
+        if entry is None or now - entry["start"] > _RESEND_RATE_WINDOW:
+            _resend_rate_mem[key] = {"start": now, "count": 1}
+            return False
+        entry["count"] += 1
+        return entry["count"] > _RESEND_RATE_MAX
+
+
+@router.post("/resend-verification", status_code=status.HTTP_200_OK)
+async def resend_verification_email(
+    body: ForgotPasswordRequest,  # reuses {email} schema
+    db: Session = Depends(get_db),
+):
+    """Resend the verification email (rate-limited)."""
+    if await _check_resend_rate_limit(body.email):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests. Please try again later.",
+        )
+
+    user = UserCRUD.get_by_email(db, body.email)
+    if not user or user.email_verified:
+        # Don't reveal whether the email exists
+        return {"message": "If an unverified account with that email exists, a verification link has been sent."}
+
+    await _send_verification_email(user, db)
+    return {"message": "If an unverified account with that email exists, a verification link has been sent."}
 
 
 # =============================================================================
@@ -897,6 +1221,39 @@ import secrets
 from app.db.models import PasswordResetToken
 from app.schemas.user import ForgotPasswordRequest, ResetPasswordRequest
 from app.utils.email import send_password_reset_email
+
+# ── Per-email rate limiting for password-reset requests ──
+_RESET_RATE_PREFIX = "pwd_reset_rate:"
+_RESET_RATE_MAX = 3           # max requests per window
+_RESET_RATE_WINDOW = 3600     # 1-hour window (seconds)
+_reset_rate_mem: dict = {}    # fallback when Redis is unavailable
+
+
+async def _check_reset_rate_limit(email: str) -> bool:
+    """Return True if the email has exceeded its password-reset rate limit."""
+    import time
+    key = f"{_RESET_RATE_PREFIX}{email.lower()}"
+    now = time.time()
+
+    # Try Redis first
+    try:
+        from app.utils.redis_client import get_redis
+        redis = await get_redis()
+        if redis:
+            count = await redis.incr(key)
+            if count == 1:
+                await redis.expire(key, _RESET_RATE_WINDOW)
+            return count > _RESET_RATE_MAX
+    except Exception:
+        pass
+
+    # In-memory fallback
+    entry = _reset_rate_mem.get(key)
+    if entry is None or now - entry["start"] > _RESET_RATE_WINDOW:
+        _reset_rate_mem[key] = {"start": now, "count": 1}
+        return False
+    entry["count"] += 1
+    return entry["count"] > _RESET_RATE_MAX
 
 
 @router.post("/forgot-password", status_code=status.HTTP_200_OK)
@@ -913,6 +1270,14 @@ async def forgot_password(
     """
     client_ip = get_client_ip(request)
     user_agent = request.headers.get("User-Agent")
+
+    # Rate-limit: max 3 reset emails per hour per email address
+    if await _check_reset_rate_limit(body.email):
+        logger.warning(f"Password reset rate-limited for email: {body.email}")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many password reset requests. Please try again later.",
+        )
 
     user = UserCRUD.get_by_email(db, body.email)
     if not user:

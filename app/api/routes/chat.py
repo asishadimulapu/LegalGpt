@@ -25,6 +25,7 @@ from app.schemas.chat import (
 )
 from fastapi.responses import StreamingResponse # Moved up
 from app.utils.logging_config import get_logger
+from app.utils.crypto import encrypt_for_user, decrypt_for_user
 
 logger = get_logger(__name__)
 
@@ -91,16 +92,18 @@ async def chat(
                 detail="Chat session not found"
             )
     else:
-        # Create new session with query as initial title
-        title = request.query[:50] + "..." if len(request.query) > 50 else request.query
-        session = ChatSessionCRUD.create(db, user_id=user_id, title=title)
+        # Create new session with query as initial title (encrypted)
+        raw_title = request.query[:50] + "..." if len(request.query) > 50 else request.query
+        enc_title = encrypt_for_user(raw_title, user_id) if user_id else raw_title
+        session = ChatSessionCRUD.create(db, user_id=user_id, title=enc_title)
     
-    # Store user message (original language)
+    # Store user message (encrypted at rest)
+    enc_content = encrypt_for_user(original_query, user_id) if user_id else original_query
     ChatMessageCRUD.create(
         db=db,
         session_id=session.id,
         role=MessageRole.USER,
-        content=original_query
+        content=enc_content
     )
     
     try:
@@ -123,12 +126,13 @@ async def chat(
             except Exception as e:
                 logger.warning(f"Response translation failed: {e}")
         
-        # Store assistant message (English canonical form)
+        # Store assistant message (encrypted at rest — store localized version)
+        enc_answer = encrypt_for_user(display_answer, user_id) if user_id else display_answer
         ChatMessageCRUD.create(
             db=db,
             session_id=session.id,
             role=MessageRole.ASSISTANT,
-            content=answer,
+            content=enc_answer,
             sources=sources_dict
         )
         
@@ -143,13 +147,15 @@ async def chat(
             except Exception as e:
                 logger.warning(f"Memory storage failed (non-fatal): {e}")
         
-        # Log query for analytics
+        # Log query for analytics (encrypted at rest)
+        enc_query = encrypt_for_user(request.query, user_id) if user_id else request.query
+        enc_resp = encrypt_for_user(answer, user_id) if user_id else answer
         QueryLogCRUD.create(
             db=db,
-            query=request.query,
+            query=enc_query,
             user_id=user_id,
             retrieved_docs=sources_dict,
-            response=answer,
+            response=enc_resp,
             sources=sources_dict,
             latency_ms=latency_ms,
             was_successful=not is_fallback
@@ -224,16 +230,18 @@ async def chat_stream(
                 )
             session_id_for_stream = session.id
         else:
-            title = request.query[:50] + "..." if len(request.query) > 50 else request.query
-            session = ChatSessionCRUD.create(db_session, user_id=user_id, title=title)
+            raw_title = request.query[:50] + "..." if len(request.query) > 50 else request.query
+            enc_title = encrypt_for_user(raw_title, user_id) if user_id else raw_title
+            session = ChatSessionCRUD.create(db_session, user_id=user_id, title=enc_title)
             session_id_for_stream = session.id
         
-        # Store user message immediately in the same session
+        # Store user message immediately (encrypted at rest)
+        enc_user_msg = encrypt_for_user(request.query, user_id) if user_id else request.query
         ChatMessageCRUD.create(
             db=db_session,
             session_id=session_id_for_stream,
             role=MessageRole.USER,
-            content=request.query
+            content=enc_user_msg
         )
 
     async def stream_generator():
@@ -277,21 +285,24 @@ async def chat_stream(
             if full_answer:
                 try:
                     with get_independent_session() as db_session:
-                        # Store assistant message
+                        # Store assistant message (encrypted at rest)
+                        enc_ans = encrypt_for_user(full_answer, user_id) if user_id else full_answer
                         ChatMessageCRUD.create(
                             db=db_session,
                             session_id=session_id_for_stream,
                             role=MessageRole.ASSISTANT,
-                            content=full_answer,
+                            content=enc_ans,
                             sources=[s.model_dump() for s in sources] # Convert LegalSource objects back to dicts for storage
                         )
                         
+                        enc_q = encrypt_for_user(request.query, user_id) if user_id else request.query
+                        enc_r = encrypt_for_user(full_answer, user_id) if user_id else full_answer
                         QueryLogCRUD.create(
                             db=db_session,
-                            query=request.query,
+                            query=enc_q,
                             user_id=user_id,
                             retrieved_docs=[s.model_dump() for s in sources], # Convert LegalSource objects back to dicts for storage
-                            response=full_answer,
+                            response=enc_r,
                             sources=[s.model_dump() for s in sources], # Convert LegalSource objects back to dicts for storage
                             latency_ms=latency_ms,
                             was_successful=not is_fallback
@@ -365,7 +376,7 @@ async def get_chat_sessions(
     return [
         ChatSessionSchema(
             id=s.id,
-            title=s.title,
+            title=decrypt_for_user(s.title, user.id),
             created_at=s.created_at,
             updated_at=s.updated_at,
             message_count=len(s.messages)
@@ -408,9 +419,12 @@ async def get_chat_session(
     
     messages = ChatMessageCRUD.get_session_messages(db, session_id)
     
+    # Determine the user_id for decryption
+    owner_id = session.user_id
+
     return ChatSessionDetailSchema(
         id=session.id,
-        title=session.title,
+        title=decrypt_for_user(session.title, owner_id) if owner_id else session.title,
         created_at=session.created_at,
         updated_at=session.updated_at,
         message_count=len(messages),
@@ -418,7 +432,7 @@ async def get_chat_session(
             ChatMessageSchema(
                 id=m.id,
                 role=m.role.value,
-                content=m.content,
+                content=decrypt_for_user(m.content, owner_id) if owner_id else m.content,
                 sources=[LegalSource(**s) for s in (m.sources or [])],
                 created_at=m.created_at
             )

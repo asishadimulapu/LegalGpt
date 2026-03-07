@@ -27,6 +27,7 @@ import {
   exportUserData,
   deleteUserAccount,
 } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import '../styles/profile.css';
 
 /* ── Constants ────────────────────────────────────────── */
@@ -82,7 +83,8 @@ function AnimatedCounter({ value, duration = 1200 }) {
 
 /* ── Main Component ───────────────────────────────────── */
 
-function ProfileDashboard({ user, onLogout }) {
+function ProfileDashboard() {
+  const { user, logout: onLogout } = useAuth();
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState(null);

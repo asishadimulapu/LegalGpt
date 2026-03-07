@@ -22,6 +22,7 @@ import {
   HelpCircle,
   Settings,
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import '../styles/sidebar.css';
 
 const NAV_ITEMS = [
@@ -37,7 +38,8 @@ const LEGAL_LINKS = [
   { path: '/disclaimer', label: 'Disclaimer', icon: AlertCircle },
 ];
 
-function Sidebar({ user, onLogout, compact = false, mobileMenuOpen = false }) {
+function Sidebar({ compact = false, mobileMenuOpen = false }) {
+  const { user, logout: onLogout } = useAuth();
   const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);

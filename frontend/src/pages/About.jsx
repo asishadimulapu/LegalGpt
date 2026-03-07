@@ -25,11 +25,12 @@ import {
     Layers,
     GitBranch
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import '../styles/about.css';
 
 function About() {
     const [isVisible, setIsVisible] = useState(false);
-    const isAuthenticated = !!localStorage.getItem('LawGPT_user');
+    const { isAuthenticated } = useAuth();
 
     useEffect(() => {
         setIsVisible(true);

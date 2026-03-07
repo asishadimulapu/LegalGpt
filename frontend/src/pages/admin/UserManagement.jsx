@@ -2,7 +2,7 @@
  * UserManagement — Admin user CRUD table with search, filter, detail modal, and actions.
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { Eye, Ban, CheckCircle, Crown, Key, Trash2, Search, MessageSquare, Mail, HelpCircle, Brain, Globe, Languages, X } from 'lucide-react';
+import { Eye, Ban, CheckCircle, Crown, Key, Trash2, Search, MessageSquare, Mail, HelpCircle, Brain, Globe, Languages, X, Lock } from 'lucide-react';
 import { getUsers, getUserDetail, updateUser, deleteUser } from '../../services/adminApi';
 
 export default function UserManagement() {
@@ -393,7 +393,10 @@ export default function UserManagement() {
                                                 display: 'flex', justifyContent: 'space-between',
                                             }}>
                                                 <span style={{ color: 'rgba(255,255,255,0.8)' }}>
-                                                    {s.title || 'Untitled Session'}
+                                                    <span className="admin-badge encrypted">
+                                                        <Lock size={12} style={{ marginRight: 4 }} />
+                                                        User Private
+                                                    </span>
                                                 </span>
                                                 <span style={{ color: 'rgba(255,255,255,0.4)' }}>
                                                     {new Date(s.updated_at).toLocaleDateString()}

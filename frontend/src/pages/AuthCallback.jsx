@@ -5,7 +5,7 @@
  * 1. Extracts authorization code and state from URL
  * 2. Validates state matches stored value (CSRF protection)
  * 3. Sends code + code_verifier to backend
- * 4. Stores JWT token and redirects to chat
+ * 4. Stores profile data and redirects to chat (JWT is set as HttpOnly cookie)
  *
  * Viva Explanation:
  * - This is the return URL after Google sign-in completes
@@ -15,9 +15,11 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import '../styles/auth-callback.css';
 
-function AuthCallback({ onLoginSuccess }) {
+function AuthCallback() {
+    const { handleLoginSuccess: onLoginSuccess } = useAuth();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const [status, setStatus] = useState('processing');
@@ -83,6 +85,7 @@ function AuthCallback({ onLoginSuccess }) {
                     (import.meta.env.PROD ? '' : 'http://localhost:8000');
                 const response = await fetch(`${API_BASE_URL}/api/v1/auth/google/callback`, {
                     method: 'POST',
+                    credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json',
                     },
@@ -160,11 +163,10 @@ function AuthCallback({ onLoginSuccess }) {
                     return;
                 }
 
-                // Web flow: store user data and redirect
+                // Web flow: store profile data (no token!) and redirect
                 const userData = {
                     email: data.user.email,
                     name: data.user.full_name,
-                    token: data.access_token,
                     is_superuser: data.user.is_superuser || false,
                 };
                 localStorage.setItem('LawGPT_user', JSON.stringify(userData));

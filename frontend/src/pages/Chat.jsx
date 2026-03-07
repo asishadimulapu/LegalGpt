@@ -29,6 +29,7 @@ import {
     getChatSession,
     deleteChatSession
 } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import '../styles/chat.css';
 
 const EXAMPLE_QUERIES = [
@@ -40,7 +41,8 @@ const EXAMPLE_QUERIES = [
 
 const ALLOWED_FILE_TYPES = ['.pdf', '.txt', '.doc', '.docx'];
 
-function Chat({ user, onLogout, onAuthClick }) {
+function Chat() {
+    const { user, logout: onLogout, openAuth: onAuthClick } = useAuth();
     const navigate = useNavigate();
     const [messages, setMessages] = useState([]);
     const [inputValue, setInputValue] = useState('');

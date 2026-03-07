@@ -210,18 +210,17 @@ def get_db() -> Generator[Session, None, None]:
 def init_db() -> None:
     """
     Initialize database tables.
-    Creates all tables defined in the models.
     
-    Viva Explanation:
-    - Uses SQLAlchemy's create_all() method
-    - Safe to call multiple times (won't recreate existing tables)
-    - Should be called on application startup
+    In production, Alembic manages schema migrations. We still call
+    create_all() as a safety net for first-run / development environments
+    where Alembic hasn't been run yet.
     """
     from app.db import models  # noqa: F401 - Import models to register them
     
     logger.info("Initializing database tables...")
     Base.metadata.create_all(bind=engine)
-    logger.info("Database tables created successfully")
+    logger.info("Database tables initialised (create_all). "
+                "Use 'alembic upgrade head' for production migrations.")
 
 
 def check_db_connection() -> bool:

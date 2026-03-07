@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     db_user: str = "postgres"
     db_password: str = ""  # Required: set in .env
     
+    # Redis (used for temp auth codes; set REDIS_URL in docker-compose)
+    redis_url: str = "redis://localhost:6379/0"
+    
     # -------------------------------------------------------------------------
     # FAISS Vector Store
     # -------------------------------------------------------------------------
@@ -102,6 +105,7 @@ class Settings(BaseSettings):
     enable_hsts: bool = True
     enable_csp: bool = True
     allowed_hosts: str = "law-gpt.app,localhost"
+    trusted_proxy_ips: str = ""  # Comma-separated list of trusted reverse-proxy IPs
     
     # Password Policy
     password_min_length: int = 12

@@ -222,7 +222,11 @@ async def get_user_detail(
         ChatSession.user_id == user.id
     ).order_by(desc(ChatSession.updated_at)).limit(5).all()
     recent_sessions = [
-        {"id": str(s.id), "title": s.title, "updated_at": s.updated_at.isoformat()}
+        {
+            "id": str(s.id),
+            "title": "\U0001F512 [Protected — User Private]",
+            "updated_at": s.updated_at.isoformat(),
+        }
         for s in recent
     ]
 
@@ -307,7 +311,7 @@ async def delete_user(
 
     db.delete(user)
     db.commit()
-    return {"detail": "User deleted", "user_id": str(user_id)}
+    return {"detail": "User deleted", "message": "User deleted", "user_id": str(user_id)}
 
 
 # =============================================================================
@@ -383,11 +387,12 @@ async def list_query_logs(
 
     items = []
     for log, user_email in logs:
+        # Privacy: never expose user query content to admin
         items.append(QueryLogItem(
             id=log.id,
             user_email=user_email,
-            query_text=log.query[:200] if log.query else "",
-            response_length=len(log.response or ""),
+            query_text="\U0001F512 [Protected — User Private]",
+            response_length=0,
             latency_ms=log.latency_ms or 0,
             num_sources=len(log.sources) if log.sources else 0,
             created_at=log.created_at,
@@ -454,7 +459,7 @@ async def delete_document(
         raise HTTPException(status_code=404, detail="Document not found")
     db.delete(doc)
     db.commit()
-    return {"detail": "Document deleted", "id": str(doc_id)}
+    return {"detail": "Document deleted", "message": "Document deleted", "id": str(doc_id)}
 
 
 # =============================================================================

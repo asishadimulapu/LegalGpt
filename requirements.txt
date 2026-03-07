@@ -7,7 +7,6 @@ pydantic-settings==2.1.0
 # Security & Cryptography
 cryptography==44.0.1
 pyjwt==2.8.0
-python-jose[cryptography]==3.5.0
 bcrypt==4.1.2
 
 # RAG & Vector Database
@@ -34,6 +33,7 @@ numpy==1.26.3
 redis==5.0.1
 psycopg2-binary==2.9.9
 sqlalchemy==2.0.25
+alembic>=1.13.0
 
 # Utilities
 python-dotenv==1.0.0

@@ -36,8 +36,35 @@ class UploadResponse(BaseModel):
 
 
 # Supported file types
-ALLOWED_EXTENSIONS = {'.pdf', '.txt', '.doc', '.docx'}
+ALLOWED_EXTENSIONS = {'.pdf', '.txt', '.docx'}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+# Magic-byte signatures for file-type validation
+FILE_SIGNATURES = {
+    '.pdf':  [b'%PDF'],
+    '.docx': [b'PK\x03\x04'],          # ZIP (OOXML) container
+    # .txt has no fixed signature — validated by exclusion
+}
+
+
+def _validate_magic_bytes(file_content: bytes, file_ext: str) -> None:
+    """Verify the file's leading bytes match the claimed extension.
+
+    This prevents an attacker from uploading an executable or script
+    renamed to .pdf/.docx.
+    """
+    signatures = FILE_SIGNATURES.get(file_ext)
+    if signatures is None:
+        # No signature to check (e.g. .txt) — OK
+        return
+    for sig in signatures:
+        if file_content[:len(sig)] == sig:
+            return
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"File content does not match the claimed '{file_ext}' format. "
+               "Upload aborted for security reasons.",
+    )
 
 
 def extract_text_from_pdf(file_content: bytes) -> str:
@@ -148,6 +175,9 @@ async def upload_file(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"File too large. Maximum size: {MAX_FILE_SIZE // (1024*1024)} MB"
         )
+
+    # Magic-byte validation — reject mismatched content
+    _validate_magic_bytes(file_content, file_ext)
     
     # Extract text based on file type
     if file_ext == '.pdf':
@@ -156,7 +186,7 @@ async def upload_file(
     elif file_ext == '.txt':
         text_content = extract_text_from_txt(file_content)
         file_type = 'TXT'
-    elif file_ext in ['.doc', '.docx']:
+    elif file_ext == '.docx':
         text_content = extract_text_from_docx(file_content)
         file_type = 'DOCX'
     else:
