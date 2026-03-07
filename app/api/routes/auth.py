@@ -102,8 +102,9 @@ async def _get_and_delete_temp_auth_code(code: str) -> dict | None:
     redis = await get_redis()
     if redis:
         key = f"{_REDIS_AUTH_PREFIX}{code}"
-        raw = await redis.getdel(key)
+        raw = await redis.get(key)
         if raw:
+            await redis.delete(key)
             return _json.loads(raw)
         return None
 
@@ -151,7 +152,9 @@ async def _verify_and_consume_oauth_state(state: str) -> bool:
     redis = await get_redis()
     if redis:
         key = f"{_REDIS_OAUTH_STATE_PREFIX}{state}"
-        result = await redis.getdel(key)
+        result = await redis.get(key)
+        if result is not None:
+            await redis.delete(key)
         return result is not None
 
     async with _oauth_states_lock:
