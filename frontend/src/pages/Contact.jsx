@@ -44,7 +44,16 @@ function Contact() {
 
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
-                throw new Error(data.detail || 'Failed to send message. Please try again.');
+                const detail = data.detail;
+                let errorMsg = 'Failed to send message. Please try again.';
+                if (typeof detail === 'string') {
+                    errorMsg = detail;
+                } else if (Array.isArray(detail)) {
+                    errorMsg = detail.map(d => d.msg || JSON.stringify(d)).join(', ');
+                } else if (detail && typeof detail === 'object' && detail.msg) {
+                    errorMsg = detail.msg;
+                }
+                throw new Error(errorMsg);
             }
 
             setSubmitted(true);
@@ -59,7 +68,7 @@ function Contact() {
                 setFormData({ name: '', email: '', subject: '', message: '' });
             }, 5000);
         } catch (err) {
-            setSubmitError(err.message);
+            setSubmitError(typeof err.message === 'string' ? err.message : String(err));
         } finally {
             setSubmitting(false);
         }
@@ -253,7 +262,7 @@ function Contact() {
                                     )}
 
                                     <p className="form-note">
-                                        * Required fields. By submitting this form, you agree to our 
+                                        * Required fields. By submitting this form, you agree to our
                                         <Link to="/privacy"> Privacy Policy</Link>.
                                     </p>
                                 </form>
