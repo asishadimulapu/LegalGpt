@@ -13,7 +13,7 @@ bcrypt>=4.1.2
 # RAG & Vector Database
 sentence-transformers==2.3.1
 langchain==0.1.4
-langchain-community==0.0.16
+langchain-community==0.4.1
 langchain-groq==0.0.1
 langchain-openai==0.0.2
 langchain-google-genai==0.0.6
