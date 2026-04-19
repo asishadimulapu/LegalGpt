@@ -1,5 +1,5 @@
 /**
- * NyayaSahay Mobile - Privacy Policy Screen
+ * LawGPT Mobile - Privacy Policy Screen
  */
 
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
@@ -37,7 +37,7 @@ const SECTIONS = [
     },
     {
         title: "Contact Us",
-        content: "For privacy concerns:\n\nEmail: privacy@nyayasahay.app\n\nWe will respond within 30 days."
+        content: "For privacy concerns:\n\nEmail: privacy@law-gpt.app\n\nWe will respond within 30 days."
     },
 ];
 
@@ -81,7 +81,7 @@ export default function PrivacyScreen() {
                 {/* Intro */}
                 <View style={styles.introCard}>
                     <Text style={styles.introText}>
-                        NyayaSahay ("we", "our", "us") is committed to protecting your privacy. 
+                        LawGPT ("we", "our", "us") is committed to protecting your privacy.
                         This policy explains how we collect, use, and safeguard your information.
                     </Text>
                 </View>

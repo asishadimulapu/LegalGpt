@@ -1,0 +1,59 @@
+# =============================================================================
+# Dependabot - Automated Dependency Updates
+# Checks for security updates and version bumps across all ecosystems
+# =============================================================================
+
+version: 2
+updates:
+  # Python (pip) — backend dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    reviewers:
+      - "AsishAdimulapu"
+
+  # JavaScript (npm) — frontend
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "frontend"
+
+  # JavaScript (npm) — mobile app
+  - package-ecosystem: "npm"
+    directory: "/mobile_app"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "mobile"
+
+  # GitHub Actions — CI/CD workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "ci"
+
+  # Docker — base image updates
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "docker"

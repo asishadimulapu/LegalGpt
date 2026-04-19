@@ -6,6 +6,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Mail, MessageCircle, MapPin, Phone, Clock, Send, CheckCircle } from 'lucide-react';
+import { ContactPageSkeleton } from '../components/SkeletonLoader';
 import '../styles/legal.css';
 
 function Contact() {
@@ -18,16 +19,21 @@ function Contact() {
     const [submitted, setSubmitted] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
     const submitTimeoutRef = useRef(null);
 
-    // Cleanup timeout on unmount
+    // Skeleton + cleanup timeout on unmount
     useEffect(() => {
+        const skTimer = setTimeout(() => setIsLoading(false), 400);
         return () => {
+            clearTimeout(skTimer);
             if (submitTimeoutRef.current) {
                 clearTimeout(submitTimeoutRef.current);
             }
         };
     }, []);
+
+    if (isLoading) return <ContactPageSkeleton />;
 
     const handleSubmit = async (e) => {
         e.preventDefault();

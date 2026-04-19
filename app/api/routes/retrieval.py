@@ -7,7 +7,8 @@ Useful for debugging, testing retrieval quality, and exploration.
 from typing import List
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from app.middleware import rate_limit
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -21,7 +22,9 @@ router = APIRouter(prefix="/retrieve", tags=["Retrieval"])
 
 
 @router.post("", response_model=RetrievalResponse)
+@rate_limit(requests_per_minute=30)
 async def retrieve_documents(
+    http_request: Request,
     request: RetrievalRequest,
     rag: RAGPipeline = Depends(get_rag_pipeline_dep)
 ) -> RetrievalResponse:
@@ -77,7 +80,9 @@ async def retrieve_documents(
 
 
 @router.post("/with-scores")
+@rate_limit(requests_per_minute=30)
 async def retrieve_documents_with_scores(
+    http_request: Request,
     request: RetrievalRequest,
     rag: RAGPipeline = Depends(get_rag_pipeline_dep)
 ) -> dict:

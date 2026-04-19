@@ -8,7 +8,8 @@ from uuid import UUID
 import json # Added for stream_generator
 import traceback
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from app.middleware import rate_limit
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db, get_independent_session
@@ -17,15 +18,15 @@ from app.db.crud import ChatSessionCRUD, ChatMessageCRUD, QueryLogCRUD, UserProf
 from app.api.dependencies import get_current_user_optional, get_rag_pipeline_dep # Kept get_current_user_optional, get_rag_pipeline_dep
 from app.core.rag_pipeline import RAGPipeline # Removed LegalSource from here, it's in schemas
 from app.core.translation import translate_to_english, translate_from_english
-from app.core.memory import store_conversation_summary, summarise_session_for_memory, get_short_term_context
+from app.core.memory import store_conversation_summary, summarise_session_for_memory
+from app.utils.crypto import encrypt_for_user, decrypt_for_user
 from app.schemas.chat import (
-    ChatRequest, ChatResponse, 
+    ChatRequest, ChatResponse,
     ChatSessionSchema, ChatSessionDetailSchema, ChatMessageSchema,
     LegalSource
 )
-from fastapi.responses import StreamingResponse # Moved up
+from fastapi.responses import StreamingResponse
 from app.utils.logging_config import get_logger
-from app.utils.crypto import encrypt_for_user, decrypt_for_user
 
 logger = get_logger(__name__)
 
@@ -33,8 +34,10 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 
 
 @router.post("", response_model=ChatResponse)
+@rate_limit(requests_per_minute=20)
 async def chat(
-    request: ChatRequest,
+    body: ChatRequest,
+    request: Request,
     db: Session = Depends(get_db),
     user: Optional[User] = Depends(get_current_user_optional),
     rag: RAGPipeline = Depends(get_rag_pipeline_dep)
@@ -65,7 +68,7 @@ async def chat(
     user_id = user.id if user else None
     
     # ── Translation: detect language & translate to English ──
-    original_query = request.query
+    original_query = body.query
     detected_lang = "en"
     try:
         # If user has a saved preferred language, use it as hint
@@ -74,18 +77,18 @@ async def chat(
             profile = UserProfileCRUD.get_or_create(db, user.id)
             source_hint = profile.preferred_language
         translated_query, detected_lang = translate_to_english(
-            request.query, source_lang=source_hint
+            body.query, source_lang=source_hint
         )
         # Update user's preferred language if auto-detected
         if user and detected_lang != "en":
             UserProfileCRUD.update(db, user.id, preferred_language=detected_lang)
     except Exception as e:
         logger.warning(f"Translation failed, using original query: {e}")
-        translated_query = request.query
+        translated_query = body.query
     
     # Get or create chat session
-    if request.session_id:
-        session = ChatSessionCRUD.get_by_id(db, request.session_id)
+    if body.session_id:
+        session = ChatSessionCRUD.get_by_id(db, body.session_id)
         if not session:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -93,7 +96,7 @@ async def chat(
             )
     else:
         # Create new session with query as initial title (encrypted)
-        raw_title = request.query[:50] + "..." if len(request.query) > 50 else request.query
+        raw_title = body.query[:50] + "..." if len(body.query) > 50 else body.query
         enc_title = encrypt_for_user(raw_title, user_id) if user_id else raw_title
         session = ChatSessionCRUD.create(db, user_id=user_id, title=enc_title)
     
@@ -137,18 +140,31 @@ async def chat(
         )
         
         # ── Store conversation summary as long-term memory ──
+        # Only for authenticated users on successful responses.
+        # Throttle: summarise every 5 messages to avoid spam.
         if user_id and not is_fallback:
             try:
-                short_ctx = get_short_term_context(db, session.id, max_messages=4)
-                summary = summarise_session_for_memory(short_ctx, llm=rag.llm)
-                store_conversation_summary(
-                    db, user_id, session.id, summary, importance=0.6
-                )
+                msg_count = ChatMessageCRUD.count_session_messages(db, session.id)
+                if msg_count % 5 == 0:
+                    # Build context with decrypted messages
+                    raw_messages = ChatMessageCRUD.get_recent_context(db, session.id, limit=6)
+                    lines = []
+                    for msg in raw_messages:
+                        role_label = "User" if msg.role.value == "user" else "Assistant"
+                        # Decrypt before summarising
+                        plain = decrypt_for_user(msg.content, user_id)
+                        lines.append(f"{role_label}: {plain[:400]}")
+                    conversation_text = "\n".join(lines)
+                    summary = summarise_session_for_memory(conversation_text, llm=rag.llm)
+                    store_conversation_summary(
+                        db, user_id, session.id, summary, importance=0.6
+                    )
+                    logger.info(f"Memory summary stored for user {user_id}")
             except Exception as e:
                 logger.warning(f"Memory storage failed (non-fatal): {e}")
         
         # Log query for analytics (encrypted at rest)
-        enc_query = encrypt_for_user(request.query, user_id) if user_id else request.query
+        enc_query = encrypt_for_user(body.query, user_id) if user_id else body.query
         enc_resp = encrypt_for_user(answer, user_id) if user_id else answer
         QueryLogCRUD.create(
             db=db,
@@ -179,7 +195,7 @@ async def chat(
         error_details = {
             "error_type": type(e).__name__,
             "error_message": str(e),
-            "query": request.query[:100],  # Truncate for logging
+            "query": body.query[:100],  # Truncate for logging
             "user_id": str(user_id) if user_id else None,
             "session_id": str(session.id) if session else None,
             "traceback": traceback.format_exc()
@@ -189,7 +205,7 @@ async def chat(
         # Log failed query with error details
         QueryLogCRUD.create(
             db=db,
-            query=request.query,
+            query=body.query,
             user_id=user_id,
             was_successful=False,
             error_message=f"{type(e).__name__}: {str(e)}"
@@ -416,15 +432,21 @@ async def get_chat_session(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied to this session"
         )
+    # SECURITY: Deny access to guest sessions (no owner) — prevents IDOR
+    if not session.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Guest sessions cannot be retrieved"
+        )
     
     messages = ChatMessageCRUD.get_session_messages(db, session_id)
     
-    # Determine the user_id for decryption
+    # Determine the user_id for decryption (which must exist due to above guard)
     owner_id = session.user_id
 
     return ChatSessionDetailSchema(
         id=session.id,
-        title=decrypt_for_user(session.title, owner_id) if owner_id else session.title,
+        title=decrypt_for_user(session.title, owner_id),
         created_at=session.created_at,
         updated_at=session.updated_at,
         message_count=len(messages),
@@ -432,7 +454,7 @@ async def get_chat_session(
             ChatMessageSchema(
                 id=m.id,
                 role=m.role.value,
-                content=decrypt_for_user(m.content, owner_id) if owner_id else m.content,
+                content=decrypt_for_user(m.content, owner_id),
                 sources=[LegalSource(**s) for s in (m.sources or [])],
                 created_at=m.created_at
             )

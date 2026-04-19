@@ -1,5 +1,5 @@
 # =============================================================================
-# NyayaSahay Frontend - Multi-stage Dockerfile
+# LawGPT Frontend - Multi-stage Dockerfile
 # Vite React build → Nginx static serving + reverse proxy
 # =============================================================================
 

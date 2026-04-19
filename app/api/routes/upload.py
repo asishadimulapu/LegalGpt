@@ -10,7 +10,10 @@ import asyncio
 from typing import Optional
 from uuid import uuid4, UUID
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, status, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, status, Depends, Request
+from app.middleware import rate_limit
+from app.db.models import User
+from app.api.dependencies import get_current_user
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -85,7 +88,7 @@ def extract_text_from_pdf(file_content: bytes) -> str:
         logger.error(f"PDF extraction error: {e}")
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Failed to extract text from PDF: {str(e)}"
+            detail="Failed to extract text from PDF. The file may be corrupted or password-protected."
         )
 
 
@@ -101,7 +104,7 @@ def extract_text_from_txt(file_content: bytes) -> str:
         logger.error(f"TXT extraction error: {e}")
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Failed to read text file: {str(e)}"
+            detail="Failed to read text file. The file encoding may be unsupported."
         )
 
 
@@ -110,12 +113,12 @@ def extract_text_from_docx(file_content: bytes) -> str:
     try:
         import io
         from zipfile import ZipFile
-        from xml.etree import ElementTree
+        import defusedxml.ElementTree as SafeET
         
         # DOCX is a ZIP file with XML content
         with ZipFile(io.BytesIO(file_content)) as zf:
             xml_content = zf.read('word/document.xml')
-            tree = ElementTree.fromstring(xml_content)
+            tree = SafeET.fromstring(xml_content)
             
             # Extract text from all paragraph elements
             namespaces = {
@@ -134,41 +137,45 @@ def extract_text_from_docx(file_content: bytes) -> str:
         logger.error(f"DOCX extraction error: {e}")
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Failed to extract text from DOCX: {str(e)}"
+            detail="Failed to extract text from DOCX. The file may be corrupted."
         )
 
 
 @router.post("", response_model=UploadResponse)
+@rate_limit(requests_per_minute=10)
 async def upload_file(
-    file: UploadFile = File(...)
+    http_request: Request,
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
 ):
     """
     Upload a case document for analysis.
-    
+
     Supported formats:
     - PDF (.pdf)
     - Text (.txt)
-    - Word Document (.doc, .docx)
-    
+    - Word Document (.docx)
+
     Args:
         file: The uploaded file
-        
+        user: The authenticated user, used for access control and audit.
+
     Returns:
         UploadResponse: Contains extracted text and file metadata
     """
     # Validate file extension
     filename = file.filename or "unknown"
     file_ext = '.' + filename.split('.')[-1].lower() if '.' in filename else ''
-    
+
     if file_ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"File type '{file_ext}' not supported. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
         )
-    
+
     # Read file content
     file_content = await file.read()
-    
+
     # Check file size
     if len(file_content) > MAX_FILE_SIZE:
         raise HTTPException(
@@ -178,7 +185,7 @@ async def upload_file(
 
     # Magic-byte validation — reject mismatched content
     _validate_magic_bytes(file_content, file_ext)
-    
+
     # Extract text based on file type
     if file_ext == '.pdf':
         text_content = extract_text_from_pdf(file_content)
@@ -194,19 +201,22 @@ async def upload_file(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unsupported file type: {file_ext}"
         )
-    
+
     # Validate extracted text
     if not text_content.strip():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="No text content could be extracted from the file"
         )
-    
+
     # Generate file ID
     file_id = str(uuid4())
-    
-    logger.info(f"Uploaded file: {filename} ({file_type}), extracted {len(text_content)} chars")
-    
+
+    logger.info(
+        f"User {user.email} (ID: {user.id}) uploaded file: "
+        f"{filename} ({file_type}), extracted {len(text_content)} chars"
+    )
+
     return UploadResponse(
         success=True,
         file_id=file_id,
@@ -238,7 +248,9 @@ class HybridAnalyzeResponse(BaseModel):
 
 
 @router.post("/analyze", response_model=HybridAnalyzeResponse)
+@rate_limit(requests_per_minute=15)
 async def analyze_document(
+    http_request: Request,
     request: AnalyzeRequest,
     db: Session = Depends(get_db),
     user: Optional[User] = Depends(get_current_user_optional)
@@ -451,11 +463,11 @@ async def analyze_document(
         logger.exception(f"Hybrid document analysis value error: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid input: {str(e)}"
+            detail="Invalid input provided for document analysis."
         ) from e
     except Exception as e:
         logger.exception(f"Hybrid document analysis error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error analyzing document: {str(e)}"
+            detail="An error occurred while analyzing the document. Please try again."
         ) from e

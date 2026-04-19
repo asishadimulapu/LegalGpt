@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { ProfilePageSkeleton } from '../components/SkeletonLoader';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   User, Mail, MapPin, Calendar, Edit3, Save, X,
@@ -226,14 +227,7 @@ function ProfileDashboard() {
 
   /* ── Loading / Error ──────────────────────────── */
   if (loading) {
-    return (
-      <div className="pf-page">
-        <div className="pf-loader">
-          <Loader className="spin" size={28} />
-          <p>Loading profile…</p>
-        </div>
-      </div>
-    );
+    return <ProfilePageSkeleton />;
   }
 
   if (!profile) {

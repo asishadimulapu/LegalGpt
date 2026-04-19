@@ -5,7 +5,7 @@ JWT authentication and password hashing utilities.
 
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import jwt  # PyJWT — actively maintained replacement for python-jose
 from jwt import InvalidTokenError
@@ -43,8 +43,18 @@ def validate_password_strength(password: str) -> Tuple[bool, str]:
     if settings.password_require_special and not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
         return False, "Password must contain at least one special character"
     
-    # Check for common weak passwords
-    weak_passwords = ['password', '12345678', 'qwerty', 'abc123', 'password123']
+    # Check for common weak passwords (expanded NIST-inspired blocklist)
+    weak_passwords = {
+        'password', '12345678', '123456789', '1234567890', 'qwerty',
+        'abc123', 'password123', 'password1', 'iloveyou', 'sunshine',
+        'princess', 'admin123', 'welcome1', 'monkey123', 'dragon',
+        'master', 'letmein', 'login', 'qwerty123', 'welcome',
+        'shadow', 'ashley', 'football', 'jesus', 'michael',
+        'ninja', 'mustang', 'password1!', 'abcdef', 'trustno1',
+        'baseball', 'superman', 'access', 'hello123', 'charlie',
+        'donald', '!@#$%^&*', 'aa123456', 'qwertyuiop',
+        'password!', 'p@ssw0rd', 'p@ssword1', 'changeme',
+    }
     if password.lower() in weak_passwords:
         return False, "Password is too common. Please choose a stronger password."
     
@@ -124,7 +134,9 @@ def create_access_token(
         "sub": str(subject),
         "exp": expire,
         "iat": datetime.now(timezone.utc),  # Issued at (timezone-aware)
-        "type": "access"
+        "type": "access",
+        "jti": str(uuid4()),   # Unique token ID for revocation tracking
+        "aud": "lawgpt:api",   # Audience claim
     }
     
     encoded_jwt = jwt.encode(
@@ -138,6 +150,7 @@ def create_access_token(
 def decode_access_token(token: str) -> Optional[dict]:
     """
     Decode and verify a JWT access token.
+    Rejects tokens that are not of type "access" (e.g. refresh tokens).
     
     Args:
         token: JWT token string
@@ -149,11 +162,17 @@ def decode_access_token(token: str) -> Optional[dict]:
         payload = jwt.decode(
             token,
             settings.jwt_secret_key,
-            algorithms=[settings.jwt_algorithm]
+            algorithms=[settings.jwt_algorithm],
+            audience="lawgpt:api",
         )
+        # SECURITY: Reject refresh tokens used as access tokens
+        if payload.get("type") != "access":
+            logger.warning("Token presented as access but type != 'access'")
+            return None
         return payload
-    except InvalidTokenError as e:
-        logger.warning(f"JWT decode error: {e}")
+    except InvalidTokenError:
+        logger.warning("JWT decode error: invalid token (see debug logs for details)")
+        logger.debug(f"JWT decode error trace", exc_info=True)
         return None
 
 
@@ -179,6 +198,8 @@ def create_refresh_token(
         "exp": expire,
         "iat": datetime.now(timezone.utc),
         "type": "refresh",
+        "jti": str(uuid4()),   # Unique token ID for revocation tracking
+        "aud": "lawgpt:refresh",
     }
 
     return jwt.encode(
@@ -198,6 +219,7 @@ def decode_refresh_token(token: str) -> Optional[dict]:
             token,
             settings.jwt_secret_key,
             algorithms=[settings.jwt_algorithm],
+            audience="lawgpt:refresh",
         )
         if payload.get("type") != "refresh":
             logger.warning("Token presented as refresh but type != 'refresh'")

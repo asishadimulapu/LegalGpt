@@ -498,8 +498,14 @@ def rate_limit(requests_per_minute: int = 60):
         async def wrapper(*args, **kwargs):
             global _endpoint_cleanup_counter
             
-            # Extract request from args or kwargs
-            request = kwargs.get('request')
+            # Extract the real FastAPI Request from args or kwargs
+            # Must type-check because 'request' kwarg might be a Pydantic body model
+            request = None
+            for key in ('request', 'http_request'):
+                candidate = kwargs.get(key)
+                if isinstance(candidate, Request):
+                    request = candidate
+                    break
             if request is None:
                 for arg in args:
                     if isinstance(arg, Request):

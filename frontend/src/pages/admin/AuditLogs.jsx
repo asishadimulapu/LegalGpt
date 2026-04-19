@@ -3,6 +3,7 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { getAuditLogs } from '../../services/adminApi';
+import { SimpleTableRowsSkeleton } from '../../components/SkeletonLoader';
 
 export default function AuditLogs() {
     const [data, setData] = useState({ logs: [], total: 0, page: 1, per_page: 20 });
@@ -73,9 +74,7 @@ export default function AuditLogs() {
                 </div>
 
                 {loading ? (
-                    <div className="admin-loading">
-                        <div className="admin-loading-spinner" />
-                    </div>
+                    <SimpleTableRowsSkeleton rows={8} cols={5} />
                 ) : error ? (
                     <div className="admin-empty">⚠️ {error}</div>
                 ) : data.logs.length === 0 ? (

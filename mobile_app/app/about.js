@@ -1,5 +1,5 @@
 /**
- * NyayaSahay Mobile - About Screen
+ * LawGPT Mobile - About Screen
  * Matches web About.jsx structure with responsive design
  */
 
@@ -44,7 +44,7 @@ export default function AboutScreen() {
                 <Pressable style={styles.menuBtn} onPress={openDrawer}>
                     <Feather name="menu" size={24} color="white" />
                 </Pressable>
-                <Text style={styles.headerTitle}>About NyayaSahay</Text>
+                <Text style={styles.headerTitle}>About LawGPT</Text>
                 <View style={{ width: 40 }} />
             </View>
 
@@ -58,10 +58,10 @@ export default function AboutScreen() {
                     <View style={styles.heroIcon}>
                         <MaterialCommunityIcons name="scale-balance" size={48} color="white" />
                     </View>
-                    <Text style={styles.heroTitle}>NyayaSahay</Text>
+                    <Text style={styles.heroTitle}>LawGPT</Text>
                     <Text style={styles.heroSubtitle}>AI-Powered Legal Assistant for India</Text>
                     <Text style={styles.heroDescription}>
-                        NyayaSahay uses advanced RAG (Retrieval Augmented Generation) technology
+                        LawGPT uses advanced RAG (Retrieval Augmented Generation) technology
                         to provide accurate legal information based on Indian law. Our mission is
                         to make legal knowledge accessible to everyone.
                     </Text>
@@ -72,7 +72,7 @@ export default function AboutScreen() {
                     <Text style={styles.sectionTitle}>Our Mission</Text>
                     <View style={styles.card}>
                         <Text style={styles.cardText}>
-                            Legal knowledge should not be a privilege. NyayaSahay democratizes
+                            Legal knowledge should not be a privilege. LawGPT democratizes
                             access to legal information, helping citizens understand their rights
                             under Indian law without expensive consultations.
                         </Text>
@@ -117,7 +117,7 @@ export default function AboutScreen() {
                     <View style={[styles.card, styles.disclaimerCard]}>
                         <Feather name="alert-triangle" size={24} color={COLORS.accentOrange} />
                         <Text style={styles.disclaimerText}>
-                            NyayaSahay provides legal information for educational purposes only.
+                            LawGPT provides legal information for educational purposes only.
                             This is NOT legal advice. For specific legal matters, please consult
                             a qualified legal professional.
                         </Text>
@@ -127,7 +127,7 @@ export default function AboutScreen() {
                 {/* Version Info */}
                 <View style={styles.versionSection}>
                     <Text style={styles.versionText}>Version 1.0.0</Text>
-                    <Text style={styles.copyrightText}>© 2024 NyayaSahay. All rights reserved.</Text>
+                    <Text style={styles.copyrightText}>© {new Date().getFullYear()} LawGPT. All rights reserved.</Text>
                 </View>
             </ScrollView>
         </View>

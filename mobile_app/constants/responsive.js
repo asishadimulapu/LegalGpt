@@ -1,5 +1,5 @@
 /**
- * NyayaSahay Mobile - Responsive Utilities
+ * LawGPT Mobile - Responsive Utilities
  * Provides scaling functions for different screen sizes
  */
 

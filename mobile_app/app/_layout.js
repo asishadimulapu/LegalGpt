@@ -1,5 +1,5 @@
 /**
- * NyayaSahay Mobile - Root Layout
+ * LawGPT Mobile - Root Layout
  * Drawer navigation matching web sidebar exactly
  */
 
@@ -63,7 +63,10 @@ function CustomDrawerContent(props) {
         try {
             const sessionList = await getChatSessions();
             setSessions(sessionList.slice(0, 5)); // Show last 5
-        } catch (_e) {
+        } catch (e) {
+            if (e.message === 'Session expired') {
+                setUser(null);
+            }
             // Silent fail - sessions will remain empty
         } finally {
             setLoadingSessions(false);
@@ -78,7 +81,7 @@ function CustomDrawerContent(props) {
     };
 
     const handleNewChat = () => {
-        router.replace('/chat');
+        router.replace({ pathname: '/chat', params: { t: Date.now() } });
         props.navigation.closeDrawer();
     };
 
@@ -105,7 +108,7 @@ function CustomDrawerContent(props) {
                         <View style={styles.logoIcon}>
                             <MaterialCommunityIcons name="scale-balance" size={22} color="white" />
                         </View>
-                        <Text style={styles.logoText}>NyayaSahay</Text>
+                        <Text style={styles.logoText}>LawGPT</Text>
                     </Pressable>
                 </View>
 
@@ -305,6 +308,9 @@ export default function RootLayout() {
                 <Drawer.Screen name="contact" options={{ drawerItemStyle: { display: 'none' } }} />
                 <Drawer.Screen name="rights" options={{ drawerItemStyle: { display: 'none' } }} />
                 <Drawer.Screen name="profile" options={{ drawerItemStyle: { display: 'none' } }} />
+                <Drawer.Screen name="forgot-password" options={{ drawerItemStyle: { display: 'none' } }} />
+                <Drawer.Screen name="reset-password" options={{ drawerItemStyle: { display: 'none' } }} />
+                <Drawer.Screen name="verify-email" options={{ drawerItemStyle: { display: 'none' } }} />
             </Drawer>
         </View>
     );

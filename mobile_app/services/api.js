@@ -1,5 +1,5 @@
 /**
- * NyayaSahay Mobile - API Service
+ * LawGPT Mobile - API Service
  * Production-ready API client with secure storage
  */
 
@@ -12,12 +12,31 @@ const API_BASE_URL = 'https://law-gpt.app';
 const REQUEST_TIMEOUT = 120000;
 
 /**
+ * Migrate old SecureStore key to new one (one-time, best-effort)
+ */
+let _migrated = false;
+export async function migrateUserStorage() {
+    if (_migrated) return;
+    _migrated = true;
+    try {
+        const existing = await SecureStore.getItemAsync('lawgpt_user');
+        if (existing) return;
+        const old = await SecureStore.getItemAsync('nyayasahay_user');
+        if (old) {
+            await SecureStore.setItemAsync('lawgpt_user', old);
+            await SecureStore.deleteItemAsync('nyayasahay_user');
+        }
+    } catch (_e) { /* best-effort */ }
+}
+
+/**
  * Get auth headers from SecureStore
  * @returns {Promise<Object>} Authorization headers or empty object
  */
 async function getAuthHeaders() {
     try {
-        const userJson = await SecureStore.getItemAsync('nyayasahay_user');
+        await migrateUserStorage();
+        const userJson = await SecureStore.getItemAsync('lawgpt_user');
         if (userJson) {
             const user = JSON.parse(userJson);
             if (user.token) {
@@ -88,12 +107,16 @@ export async function getChatSessions() {
         });
 
         if (!response.ok) {
-            if (response.status === 401) return [];
+            if (response.status === 401) {
+                await clearUser();
+                throw new Error('Session expired');
+            }
             throw new Error('Failed to fetch sessions');
         }
 
         return await response.json();
-    } catch (_error) {
+    } catch (error) {
+        if (error.message === 'Session expired') throw error;
         // Silent fail - return empty array
         return [];
     }
@@ -229,9 +252,9 @@ export async function exchangeGoogleToken(googleAccessToken) {
 export async function saveUser(userData) {
     try {
         const jsonStr = JSON.stringify(userData);
-        await SecureStore.setItemAsync('nyayasahay_user', jsonStr);
+        await SecureStore.setItemAsync('lawgpt_user', jsonStr);
         // Verify the save was successful by reading it back
-        const verify = await SecureStore.getItemAsync('nyayasahay_user');
+        const verify = await SecureStore.getItemAsync('lawgpt_user');
         if (!verify) {
             throw new Error('Failed to verify saved user data');
         }
@@ -247,7 +270,7 @@ export async function saveUser(userData) {
  */
 export async function getUser() {
     try {
-        const userJson = await SecureStore.getItemAsync('nyayasahay_user');
+        const userJson = await SecureStore.getItemAsync('lawgpt_user');
         if (!userJson) return null;
         const parsed = JSON.parse(userJson);
         // Validate that we have a token
@@ -262,7 +285,7 @@ export async function getUser() {
  * Clear user from SecureStore (logout)
  */
 export async function clearUser() {
-    await SecureStore.deleteItemAsync('nyayasahay_user');
+    await SecureStore.deleteItemAsync('lawgpt_user');
 }
 
 /**
@@ -414,12 +437,16 @@ export async function getUserProfile() {
             headers: { 'Content-Type': 'application/json', ...authHeaders },
         });
         if (!response.ok) {
-            if (response.status === 401) return null;
+            if (response.status === 401) {
+                await clearUser();
+                throw new Error('Session expired');
+            }
             const err = await response.json().catch(() => ({}));
             throw new Error(err.detail || 'Failed to fetch profile');
         }
         return await response.json();
     } catch (error) {
+        if (error.message === 'Session expired') throw error;
         if (error.message?.includes('Failed to fetch')) throw new Error('Unable to connect to server');
         throw error;
     }
@@ -556,6 +583,60 @@ export async function deleteUserAccount() {
     }
 }
 
+// =============================================================================
+// Password Reset & Email Verification API
+// =============================================================================
+
+/**
+ * Request a password reset email
+ * @param {string} email - User's email address
+ */
+export async function forgotPassword(email) {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+    });
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to send reset email');
+    }
+    return await response.json();
+}
+
+/**
+ * Reset password using token from email
+ * @param {string} token - Reset token from email link
+ * @param {string} newPassword - New password
+ */
+export async function resetPassword(token, newPassword) {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, new_password: newPassword }),
+    });
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to reset password');
+    }
+    return await response.json();
+}
+
+/**
+ * Verify email with token from verification email
+ * @param {string} token - Verification token
+ */
+export async function verifyEmail(token) {
+    const response = await fetch(
+        `${API_BASE_URL}/api/v1/auth/verify-email?token=${encodeURIComponent(token)}`
+    );
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || 'Email verification failed');
+    }
+    return await response.json();
+}
+
 export default {
     sendChatMessage,
     getChatSessions,
@@ -577,4 +658,7 @@ export default {
     clearUserMemories,
     exportUserData,
     deleteUserAccount,
+    forgotPassword,
+    resetPassword,
+    verifyEmail,
 };

@@ -1,5 +1,5 @@
 /**
- * NyayaSahay Mobile - Chat Screen
+ * LawGPT Mobile - Chat Screen
  * Pixel-perfect replica of web Chat.jsx with responsive design
  */
 
@@ -79,9 +79,9 @@ export default function ChatScreen() {
             setSessionId(null);
             setUploadedFile(null);
             setFileContent(null);
-            setUploadError(null);
+            setInputValue('');
         }
-    }, [params.session, isBackendReady]);
+    }, [params.session, isBackendReady, params.t]);
 
     // Handle query from params (quick questions)
     useEffect(() => {
@@ -256,7 +256,7 @@ export default function ChatScreen() {
         setUploadError(null);
         setInputValue('');
         // Navigate to chat without session param to trigger reset
-        router.replace('/chat');
+        router.replace({ pathname: '/chat', params: { t: Date.now() } });
     };
 
     // Handle file picking
@@ -332,7 +332,7 @@ export default function ChatScreen() {
     return (
         <KeyboardAvoidingView
             style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={0}
         >
             <StatusBar style="dark" />
@@ -390,7 +390,7 @@ export default function ChatScreen() {
                         <View style={styles.emptyIcon}>
                             <MaterialCommunityIcons name="scale-balance" size={40} color="white" />
                         </View>
-                        <Text style={styles.emptyTitle}>Welcome to NyayaSahay</Text>
+                        <Text style={styles.emptyTitle}>Welcome to LawGPT</Text>
                         <Text style={styles.emptySubtitle}>
                             Your AI-powered legal assistant for Indian law
                         </Text>

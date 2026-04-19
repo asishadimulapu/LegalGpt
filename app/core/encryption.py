@@ -20,6 +20,7 @@ import base64
 import hmac
 import hashlib
 import tempfile
+import threading
 from typing import Tuple, Dict, Optional
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -63,7 +64,7 @@ class ServerEncryptionManager:
                 )
             else:
                 logger.warning("No encryption key provided - generating ephemeral key")
-                self.metadata_key = Fernet.generate_key()
+                self.metadata_key = base64.urlsafe_b64decode(Fernet.generate_key())
         
         self.fernet = Fernet(base64.urlsafe_b64encode(self.metadata_key))
         self._load_or_generate_server_keys()
@@ -84,10 +85,21 @@ class ServerEncryptionManager:
         # Derive a stable passphrase from the encryption key (via PBKDF2)
         _passphrase: Optional[bytes] = None
         if self.metadata_key:
+            # Derive a unique salt from the encryption key using HKDF
+            # This ensures each deployment gets a unique salt, but it's
+            # deterministic for the same key (so key loading stays consistent)
+            salt_kdf = HKDF(
+                algorithm=hashes.SHA256(),
+                length=16,
+                salt=None,
+                info=b"lawgpt-rsa-passphrase-salt-v2",
+                backend=self.backend,
+            )
+            derived_salt = salt_kdf.derive(self.metadata_key)
             kdf = PBKDF2HMAC(
                 algorithm=hashes.SHA256(),
                 length=32,
-                salt=b"lawgpt-rsa-passphrase-v1",
+                salt=derived_salt,
                 iterations=PBKDF2_ITERATIONS,
             )
             _passphrase = kdf.derive(self.metadata_key)
@@ -170,9 +182,12 @@ class ServerEncryptionManager:
                     os.fchmod(tmp_fd, 0o600)
                 os.close(tmp_fd)
                 fd_closed = True
-                os.replace(tmp_path, str(private_key_path))
+                
+                # If fchmod isn't available, set it on the path before moving to avoid a window of vulnerability
                 if not hasattr(os, 'fchmod'):
-                    os.chmod(private_key_path, 0o600)
+                    os.chmod(tmp_path, 0o600)
+                    
+                os.replace(tmp_path, str(private_key_path))
             except Exception:
                 if not fd_closed:
                     os.close(tmp_fd)
@@ -308,14 +323,18 @@ class ServerEncryptionManager:
             del data
 
 
-# Global instance
+# Global instance and lock for singleton semantics
 _encryption_manager = None
+_encryption_manager_lock = threading.Lock()
 
 def get_encryption_manager() -> ServerEncryptionManager:
-    """Get or create global encryption manager instance."""
+    """Get or create global encryption manager instance safely."""
     global _encryption_manager
     if _encryption_manager is None:
-        _encryption_manager = ServerEncryptionManager()
+        with _encryption_manager_lock:
+            # Double check to prevent race conditions during heavy concurrent load
+            if _encryption_manager is None:
+                _encryption_manager = ServerEncryptionManager()
     return _encryption_manager
 
 

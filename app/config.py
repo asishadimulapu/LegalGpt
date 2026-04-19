@@ -113,6 +113,13 @@ class Settings(BaseSettings):
     password_require_lowercase: bool = True
     password_require_digit: bool = True
     password_require_special: bool = True
+    
+    # Account Lockout (brute-force protection)
+    account_lockout_threshold: int = 5       # Lock after N failed attempts
+    account_lockout_duration_minutes: int = 15  # Lockout duration
+    
+    # Request Body Size Limit (DoS protection)
+    max_body_size_mb: int = 10  # Maximum request body in megabytes
 
     # -------------------------------------------------------------------------
     # Brevo (Sendinblue) Transactional Email

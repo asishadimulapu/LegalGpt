@@ -3,14 +3,23 @@
  * Frequently Asked Questions for better content value
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, HelpCircle, ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { FAQPageSkeleton } from '../components/SkeletonLoader';
 import '../styles/legal.css';
 
 function FAQ() {
     const [searchTerm, setSearchTerm] = useState('');
     const [openIndex, setOpenIndex] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const t = setTimeout(() => setIsLoading(false), 400);
+        return () => clearTimeout(t);
+    }, []);
+
+    if (isLoading) return <FAQPageSkeleton />;
 
     const faqData = [
         {

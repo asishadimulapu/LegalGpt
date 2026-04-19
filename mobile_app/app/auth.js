@@ -1,5 +1,5 @@
 /**
- * NyayaSahay Mobile - Auth Screen
+ * LawGPT Mobile - Auth Screen
  * Pixel-perfect replica of web AuthModal.jsx with responsive design
  */
 
@@ -235,7 +235,7 @@ export default function AuthScreen() {
                     <Text style={styles.subtitle}>
                         {isSignIn
                             ? 'Sign in to access your legal consultation history'
-                            : 'Join NyayaSahay for personalized legal guidance'
+                            : 'Join LawGPT for personalized legal guidance'
                         }
                     </Text>
                 </View>
@@ -343,6 +343,13 @@ export default function AuthScreen() {
                                 autoCapitalize="none"
                             />
                         </View>
+                    )}
+
+                    {/* Forgot Password */}
+                    {isSignIn && (
+                        <Pressable onPress={() => router.push('/forgot-password')}>
+                            <Text style={styles.forgotLink}>Forgot Password?</Text>
+                        </Pressable>
                     )}
 
                     {/* Error */}
@@ -585,5 +592,11 @@ const styles = StyleSheet.create({
     legalLink: {
         color: COLORS.primary,
         fontFamily: 'Inter_500Medium',
+    },
+    forgotLink: {
+        fontSize: 14,
+        fontFamily: 'Inter_500Medium',
+        color: COLORS.primary,
+        textAlign: 'right',
     },
 });

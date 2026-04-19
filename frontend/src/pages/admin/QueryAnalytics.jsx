@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Zap, CheckCircle, Lock } from 'lucide-react';
 import { getQueryAnalytics, getQueryLogs } from '../../services/adminApi';
+import { AdminAnalyticsSkeleton } from '../../components/SkeletonLoader';
 
 export default function QueryAnalytics() {
     const [analytics, setAnalytics] = useState(null);
@@ -41,12 +42,7 @@ export default function QueryAnalytics() {
     };
 
     if (loading) {
-        return (
-            <div className="admin-loading">
-                <div className="admin-loading-spinner" />
-                <p>Loading analytics...</p>
-            </div>
-        );
+        return <AdminAnalyticsSkeleton />;
     }
 
     if (error) return <div className="admin-empty">{error}</div>;

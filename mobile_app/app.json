@@ -1,6 +1,7 @@
 {
   "expo": {
-    "name": "NyayaSahay",
+    "name": "LawGPT",
+    "_slugNote": "slug kept as nyayasahay-mobile for EAS project ID backward compatibility",
     "slug": "nyayasahay-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -45,6 +46,7 @@
       "eas": {
         "projectId": "61c2cd27-8cb3-4cc1-87ca-49a6332cd259"
       }
-    }
+    },
+    "owner": "ash234"
   }
 }

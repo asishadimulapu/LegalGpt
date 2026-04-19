@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Eye, Ban, CheckCircle, Crown, Key, Trash2, Search, MessageSquare, Mail, HelpCircle, Brain, Globe, Languages, X, Lock } from 'lucide-react';
 import { getUsers, getUserDetail, updateUser, deleteUser } from '../../services/adminApi';
+import { AdminTableSkeleton, SimpleTableRowsSkeleton } from '../../components/SkeletonLoader';
 
 export default function UserManagement() {
     const [data, setData] = useState({ users: [], total: 0, page: 1, per_page: 20, total_pages: 1 });
@@ -118,9 +119,7 @@ export default function UserManagement() {
                 </div>
 
                 {loading ? (
-                    <div className="admin-loading">
-                        <div className="admin-loading-spinner" />
-                    </div>
+                    <AdminTableSkeleton cols={6} rows={8} />
                 ) : error ? (
                     <div className="admin-empty">⚠️ {error}</div>
                 ) : (
@@ -277,10 +276,7 @@ export default function UserManagement() {
                         onClick={(e) => e.stopPropagation()}
                     >
                         {detailLoading ? (
-                            <div className="admin-loading">
-                                <div className="admin-loading-spinner" />
-                                <p>Loading user details...</p>
-                            </div>
+                            <SimpleTableRowsSkeleton rows={4} cols={2} />
                         ) : selectedUser && (
                             <>
                                 {/* Close button */}

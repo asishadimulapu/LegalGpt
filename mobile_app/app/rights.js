@@ -1,5 +1,5 @@
 /**
- * NyayaSahay Mobile - Your Rights Screen
+ * LawGPT Mobile - Your Rights Screen
  * Matches web Rights.jsx with three tabs: Fundamental Rights, Quick Guides, IPC Sections
  */
 

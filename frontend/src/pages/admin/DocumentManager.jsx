@@ -3,6 +3,7 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { getDocuments, deleteDocument } from '../../services/adminApi';
+import { SimpleTableRowsSkeleton } from '../../components/SkeletonLoader';
 
 export default function DocumentManager() {
     const [data, setData] = useState({ documents: [], total: 0, page: 1, per_page: 20 });
@@ -57,9 +58,7 @@ export default function DocumentManager() {
                 </div>
 
                 {loading ? (
-                    <div className="admin-loading">
-                        <div className="admin-loading-spinner" />
-                    </div>
+                    <SimpleTableRowsSkeleton rows={8} cols={6} />
                 ) : error ? (
                     <div className="admin-empty">⚠️ {error}</div>
                 ) : data.documents.length === 0 ? (

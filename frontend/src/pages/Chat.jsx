@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
+import { ChatLoadingSkeleton, SessionListSkeleton } from '../components/SkeletonLoader';
 import { useNavigate } from 'react-router-dom';
 import {
     Scale,
@@ -319,8 +320,7 @@ function Chat() {
     if (isBackendReady === null) {
         return (
             <div className="chat-loading">
-                <Loader2 className="chat-loading-spinner" size={48} />
-                <p>Connecting to Legal Assistant...</p>
+                <ChatLoadingSkeleton />
             </div>
         );
     }
@@ -339,10 +339,7 @@ function Chat() {
                             <Clock size={14} /> Chat History
                         </h4>
                         {loadingSessions ? (
-                            <div className="sessions-loading">
-                                <Loader2 size={16} className="spinning" />
-                                Loading...
-                            </div>
+                            <SessionListSkeleton count={5} />
                         ) : sessions.length > 0 ? (
                             <div className="session-list">
                                 {sessions.map((session) => (

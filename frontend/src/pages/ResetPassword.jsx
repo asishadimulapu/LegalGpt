@@ -4,10 +4,11 @@
  * Lets the user set a new password.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { Scale, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import { resetPassword } from '../services/api';
+import { AuthCardSkeleton } from '../components/SkeletonLoader';
 import '../styles/auth.css';
 
 function ResetPassword() {
@@ -21,6 +22,10 @@ function ResetPassword() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isMounting, setIsMounting] = useState(true);
+
+    useEffect(() => { const t = setTimeout(() => setIsMounting(false), 300); return () => clearTimeout(t); }, []);
+    if (isMounting) return <AuthCardSkeleton />;
 
     const validate = () => {
         if (!token) return 'Invalid reset link — no token found.';

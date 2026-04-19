@@ -1,5 +1,5 @@
 /**
- * NyayaSahay Mobile - Contact Screen
+ * LawGPT Mobile - Contact Screen
  */
 
 import { View, Text, StyleSheet, ScrollView, Pressable, Linking } from 'react-native';
@@ -14,28 +14,28 @@ const CONTACT_METHODS = [
     {
         icon: "mail",
         title: "Email Support",
-        detail: "support@nyayasahay.app",
+        detail: "support@law-gpt.app",
         subtitle: "We typically respond within 24 hours",
-        action: () => Linking.openURL('mailto:support@nyayasahay.app'),
+        action: () => Linking.openURL('mailto:support@law-gpt.app').catch(() => console.warn('Failed to open email client')),
     },
     {
         icon: "globe",
         title: "Website",
-        detail: "www.nyayasahay.app",
+        detail: "www.law-gpt.app",
         subtitle: "Visit our website for more information",
-        action: () => Linking.openURL('https://nyayasahay.app'),
+        action: () => Linking.openURL('https://law-gpt.app').catch(() => console.warn('Failed to open website')),
     },
     {
         icon: "github",
         title: "GitHub",
         detail: "Open Source Project",
         subtitle: "Report issues or contribute",
-        action: () => Linking.openURL('https://github.com/nyayasahay'),
+        action: () => Linking.openURL('https://github.com/asishadimulapu/LegalGpt').catch(() => console.warn('Failed to open GitHub')),
     },
 ];
 
 const FAQ_PREVIEW = [
-    { q: "How do I use NyayaSahay?", a: "Simply type your legal question in the chat and our AI will provide information based on Indian law." },
+    { q: "How do I use LawGPT?", a: "Simply type your legal question in the chat and our AI will provide information based on Indian law." },
     { q: "Is my data secure?", a: "Yes, we use encryption and secure storage to protect your data." },
     { q: "Can I get legal advice?", a: "No, we provide legal information only. For advice, consult a qualified advocate." },
 ];

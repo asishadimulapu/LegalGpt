@@ -1,5 +1,5 @@
 /**
- * NyayaSahay Mobile - ChatBubble Component
+ * LawGPT Mobile - ChatBubble Component
  * Pixel-perfect replica of web ChatBubble.jsx
  */
 
@@ -33,7 +33,7 @@ export default function ChatBubble({
         switch (level) {
             case 'high': return COLORS.accentGreen;
             case 'medium': return COLORS.accentOrange;
-            default: return COLORS.textMuted;
+            default: return '#EF4444';
         }
     };
 

@@ -394,6 +394,17 @@ class ChatMessageCRUD:
             .all()
         )[::-1]  # Reverse to get chronological order
 
+    @staticmethod
+    def count_session_messages(
+        db: Session,
+        session_id: uuid.UUID
+    ) -> int:
+        """Count total messages in a session (used for memory throttling)."""
+        from sqlalchemy import func
+        return db.query(func.count(ChatMessage.id)).filter(
+            ChatMessage.session_id == session_id
+        ).scalar() or 0
+
 
 # =============================================================================
 # Query Log CRUD Operations

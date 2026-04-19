@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, UserCheck, UserPlus, MessageSquare, Mail, Search, Zap, Clock } from 'lucide-react';
 import { getDashboardStats } from '../../services/adminApi';
+import { AdminDashboardSkeleton } from '../../components/SkeletonLoader';
 
 export default function AdminDashboard() {
     const [stats, setStats] = useState(null);
@@ -24,14 +25,7 @@ export default function AdminDashboard() {
         load();
     }, []);
 
-    if (loading) {
-        return (
-            <div className="admin-loading">
-                <div className="admin-loading-spinner" />
-                <p>Loading dashboard...</p>
-            </div>
-        );
-    }
+    if (loading) return <AdminDashboardSkeleton />;
 
     if (error) {
         return <div className="admin-empty">{error}</div>;

@@ -1,5 +1,5 @@
 /**
- * NyayaSahay Mobile - Terms of Service Screen
+ * LawGPT Mobile - Terms of Service Screen
  */
 
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
@@ -13,11 +13,11 @@ import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
 const SECTIONS = [
     {
         title: "1. Acceptance of Terms",
-        content: "By accessing or using NyayaSahay, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our service."
+        content: "By accessing or using LawGPT, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our service."
     },
     {
         title: "2. Nature of Service",
-        content: "NyayaSahay provides legal information only, NOT legal advice. The information provided:\n\n• Is for educational purposes only\n• Should not be relied upon as legal advice\n• Does not create an attorney-client relationship\n• May not reflect the most current legal developments\n\nAlways consult a qualified legal professional for specific legal matters."
+        content: "LawGPT provides legal information only, NOT legal advice. The information provided:\n\n• Is for educational purposes only\n• Should not be relied upon as legal advice\n• Does not create an attorney-client relationship\n• May not reflect the most current legal developments\n\nAlways consult a qualified legal professional for specific legal matters."
     },
     {
         title: "3. User Responsibilities",
@@ -25,19 +25,19 @@ const SECTIONS = [
     },
     {
         title: "4. Prohibited Uses",
-        content: "You may not use NyayaSahay to:\n\n• Violate any laws or regulations\n• Harass, abuse, or harm others\n• Transmit malware or viruses\n• Attempt unauthorized access\n• Impersonate others\n• Interfere with service operation"
+        content: "You may not use LawGPT to:\n\n• Violate any laws or regulations\n• Harass, abuse, or harm others\n• Transmit malware or viruses\n• Attempt unauthorized access\n• Impersonate others\n• Interfere with service operation"
     },
     {
         title: "5. Intellectual Property",
-        content: "All content, features, and functionality are owned by NyayaSahay and protected by intellectual property laws. You may not:\n\n• Copy or modify our content\n• Use our branding without permission\n• Reverse engineer our technology\n• Create derivative works"
+        content: "All content, features, and functionality are owned by LawGPT and protected by intellectual property laws. You may not:\n\n• Copy or modify our content\n• Use our branding without permission\n• Reverse engineer our technology\n• Create derivative works"
     },
     {
         title: "6. Disclaimer of Warranties",
-        content: "NyayaSahay is provided \"AS IS\" without warranties of any kind. We do not guarantee:\n\n• Accuracy of legal information\n• Uninterrupted service availability\n• Error-free operation\n• Fitness for any particular purpose"
+        content: "LawGPT is provided \"AS IS\" without warranties of any kind. We do not guarantee:\n\n• Accuracy of legal information\n• Uninterrupted service availability\n• Error-free operation\n• Fitness for any particular purpose"
     },
     {
         title: "7. Limitation of Liability",
-        content: "To the maximum extent permitted by law, NyayaSahay shall not be liable for any:\n\n• Indirect or consequential damages\n• Loss of profits or data\n• Damages from reliance on information provided\n• Service interruptions"
+        content: "To the maximum extent permitted by law, LawGPT shall not be liable for any:\n\n• Indirect or consequential damages\n• Loss of profits or data\n• Damages from reliance on information provided\n• Service interruptions"
     },
     {
         title: "8. Changes to Terms",
@@ -49,7 +49,7 @@ const SECTIONS = [
     },
     {
         title: "10. Contact",
-        content: "For questions about these terms:\n\nEmail: legal@nyayasahay.app"
+        content: "For questions about these terms:\n\nEmail: legal@law-gpt.app"
     },
 ];
 
@@ -94,7 +94,7 @@ export default function TermsScreen() {
                 <View style={styles.warningCard}>
                     <Feather name="alert-triangle" size={24} color={COLORS.accentOrange} />
                     <Text style={styles.warningText}>
-                        Please read these terms carefully. By using NyayaSahay, you agree to these terms.
+                        Please read these terms carefully. By using LawGPT, you agree to these terms.
                     </Text>
                 </View>
 

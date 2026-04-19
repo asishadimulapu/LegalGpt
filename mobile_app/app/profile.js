@@ -1,5 +1,5 @@
 /**
- * NyayaSahay Mobile - Profile Dashboard
+ * LawGPT Mobile - Profile Dashboard
  * Matches web ProfileDashboard.jsx with tabs: General, Interests, AI Memory, Privacy & Data
  */
 
@@ -184,12 +184,12 @@ export default function ProfileScreen() {
         try {
             const data = await exportUserData();
             const json = JSON.stringify(data, null, 2);
-            const filename = `nyayasahay_export_${new Date().toISOString().slice(0, 10)}.json`;
+            const filename = `LawGPT_export_${new Date().toISOString().slice(0, 10)}.json`;
             const path = `${FileSystem.cacheDirectory}${filename}`;
             await FileSystem.writeAsStringAsync(path, json);
             await Sharing.shareAsync(path, {
                 mimeType: 'application/json',
-                dialogTitle: 'NyayaSahay Data Export',
+                dialogTitle: 'LawGPT Data Export',
             });
         } catch (err) {
             console.error('Export failed:', err);
@@ -337,7 +337,7 @@ export default function ProfileScreen() {
                         />
                     ) : (
                         <Text style={styles.profileName}>
-                            {profile.full_name || 'NyayaSahay User'}
+                            {profile.full_name || 'LawGPT User'}
                         </Text>
                     )}
 

@@ -12,7 +12,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
+from app.middleware import rate_limit
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, aliased
 from sqlalchemy import func, desc, cast, String, and_
@@ -42,7 +43,9 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
 # Dashboard Overview
 # =============================================================================
 @router.get("/dashboard", response_model=DashboardStats)
+@rate_limit(requests_per_minute=30)
 async def get_dashboard_stats(
+    http_request: Request,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
@@ -100,7 +103,9 @@ async def get_dashboard_stats(
 # User Management
 # =============================================================================
 @router.get("/users", response_model=UserListResponse)
+@rate_limit(requests_per_minute=60)
 async def list_users(
+    http_request: Request,
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     search: Optional[str] = None,
@@ -183,7 +188,9 @@ async def list_users(
 
 
 @router.get("/users/{user_id}", response_model=UserAdminDetail)
+@rate_limit(requests_per_minute=60)
 async def get_user_detail(
+    http_request: Request,
     user_id: UUID,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -250,7 +257,9 @@ async def get_user_detail(
 
 
 @router.patch("/users/{user_id}", response_model=UserAdminItem)
+@rate_limit(requests_per_minute=20)
 async def update_user(
+    http_request: Request,
     user_id: UUID,
     updates: UserUpdateAdmin,
     admin: User = Depends(require_admin),
@@ -297,7 +306,9 @@ async def update_user(
 
 
 @router.delete("/users/{user_id}")
+@rate_limit(requests_per_minute=10)
 async def delete_user(
+    http_request: Request,
     user_id: UUID,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -318,7 +329,9 @@ async def delete_user(
 # Query Analytics
 # =============================================================================
 @router.get("/queries/analytics", response_model=QueryAnalytics)
+@rate_limit(requests_per_minute=30)
 async def get_query_analytics(
+    http_request: Request,
     days: int = Query(30, ge=1, le=365),
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -365,7 +378,9 @@ async def get_query_analytics(
 
 
 @router.get("/queries", response_model=QueryLogListResponse)
+@rate_limit(requests_per_minute=30)
 async def list_query_logs(
+    http_request: Request,
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     admin: User = Depends(require_admin),
@@ -407,7 +422,9 @@ async def list_query_logs(
 # Document Management
 # =============================================================================
 @router.get("/documents", response_model=DocumentListResponse)
+@rate_limit(requests_per_minute=30)
 async def list_documents(
+    http_request: Request,
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     source: Optional[str] = None,
@@ -432,7 +449,7 @@ async def list_documents(
                 id=d.id,
                 source=d.source or "",
                 act_type=d.act_type,
-                chunk_index=d.chunk_index or 0,
+                chunk_index=getattr(d, 'chunk_index', 0) or 0,
                 content_preview=(d.content[:150] + "...") if d.content and len(d.content) > 150 else (d.content or ""),
                 created_at=d.created_at,
             )
@@ -448,7 +465,9 @@ async def list_documents(
 
 
 @router.delete("/documents/{doc_id}")
+@rate_limit(requests_per_minute=10)
 async def delete_document(
+    http_request: Request,
     doc_id: UUID,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -466,7 +485,9 @@ async def delete_document(
 # Audit Logs
 # =============================================================================
 @router.get("/audit-logs", response_model=AuditLogListResponse)
+@rate_limit(requests_per_minute=30)
 async def list_audit_logs(
+    http_request: Request,
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     event_type: Optional[str] = None,
@@ -533,7 +554,9 @@ async def list_audit_logs(
 # System Settings
 # =============================================================================
 @router.get("/settings", response_model=SystemSettings)
+@rate_limit(requests_per_minute=20)
 async def get_settings(
+    http_request: Request,
     admin: User = Depends(require_admin),
 ):
     """Get current system settings from environment."""

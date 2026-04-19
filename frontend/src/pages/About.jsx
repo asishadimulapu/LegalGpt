@@ -26,14 +26,17 @@ import {
     GitBranch
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { AboutPageSkeleton } from '../components/SkeletonLoader';
 import '../styles/about.css';
 
 function About() {
     const [isVisible, setIsVisible] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const { isAuthenticated } = useAuth();
 
     useEffect(() => {
-        setIsVisible(true);
+        const t = setTimeout(() => { setIsLoading(false); setIsVisible(true); }, 400);
+        return () => clearTimeout(t);
     }, []);
 
     const stats = [
@@ -77,6 +80,7 @@ function About() {
         'Motor Vehicles Act',
     ];
 
+    if (isLoading) return <AboutPageSkeleton />;
     return (
         <div className={`about-page ${isVisible ? 'visible' : ''}`}>
             {/* Hero Section */}

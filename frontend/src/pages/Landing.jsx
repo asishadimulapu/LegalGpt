@@ -30,15 +30,22 @@ import {
     MessageCircle
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { LandingPageSkeleton } from '../components/SkeletonLoader';
 import '../styles/landing.css';
 
 function Landing() {
     const { openAuth: onAuthClick } = useAuth();
     const navigate = useNavigate();
     const [isVisible, setIsVisible] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        setIsVisible(true);
+        // Short skeleton splash so the page never flashes empty
+        const t = setTimeout(() => {
+            setIsLoading(false);
+            setIsVisible(true);
+        }, 400);
+        return () => clearTimeout(t);
     }, []);
 
     const features = [
@@ -150,6 +157,8 @@ function Landing() {
     const handleStartChat = () => {
         navigate('/chat');
     };
+
+    if (isLoading) return <LandingPageSkeleton />;
 
     return (
         <div className={`landing ${isVisible ? 'visible' : ''}`}>

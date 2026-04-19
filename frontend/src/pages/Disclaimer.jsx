@@ -3,12 +3,16 @@
  * Important legal disclaimer about the service
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, AlertTriangle, Shield, Scale } from 'lucide-react';
+import { LegalPageSkeleton } from '../components/SkeletonLoader';
 import '../styles/legal.css';
 
 function Disclaimer() {
+    const [isLoading, setIsLoading] = useState(true);
+    useEffect(() => { const t = setTimeout(() => setIsLoading(false), 350); return () => clearTimeout(t); }, []);
+    if (isLoading) return <LegalPageSkeleton />;
     return (
         <div className="legal-page">
             <div className="legal-container">

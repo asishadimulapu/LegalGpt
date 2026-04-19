@@ -1,5 +1,5 @@
 # =============================================================================
-# NyayaSahay Backend - Multi-stage Dockerfile
+# LawGPT Backend - Multi-stage Dockerfile
 # FastAPI + FAISS + RAG Pipeline
 # =============================================================================
 
@@ -41,22 +41,22 @@ COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Create non-root user for security
-RUN groupadd -r nyayasahay && useradd -r -g nyayasahay -d /app -s /sbin/nologin nyayasahay
+RUN groupadd -r lawgpt && useradd -r -g lawgpt -d /app -s /sbin/nologin lawgpt
 
 WORKDIR /app
 
-# Copy application code
-COPY app/ ./app/
-COPY scripts/ ./scripts/
-COPY run.py .
-COPY requirements.txt .
+# Copy application code (owned by non-root user from the start)
+COPY --chown=lawgpt:lawgpt app/ ./app/
+COPY --chown=lawgpt:lawgpt scripts/ ./scripts/
+COPY --chown=lawgpt:lawgpt run.py .
+COPY --chown=lawgpt:lawgpt requirements.txt .
 
 # Create directories for runtime data
 RUN mkdir -p data/faiss_index logs && \
-    chown -R nyayasahay:nyayasahay /app
+    chown -R lawgpt:lawgpt /app
 
 # Switch to non-root user
-USER nyayasahay
+USER lawgpt
 
 # Expose API port
 EXPOSE 8000

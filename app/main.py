@@ -133,9 +133,10 @@ app = FastAPI(
     Always consult a qualified legal professional for legal matters.
     """,
     version=settings.app_version,
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    # SECURITY: Disable API docs in production to prevent schema exposure
+    docs_url="/docs" if settings.is_development else None,
+    redoc_url="/redoc" if settings.is_development else None,
+    openapi_url="/openapi.json" if settings.is_development else None,
     lifespan=lifespan
 )
 
@@ -180,23 +181,30 @@ if "*" not in cors_origins:
     cors_origins = list(set(cors_origins + [
         "https://law-gpt.app",
     ]))
-    # Always allow localhost for local development/testing
-    # (localhost origins cannot be spoofed from the internet, so this is safe)
-    cors_origins.extend([
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-        "http://localhost:8000",
-    ])
+    # SECURITY: Only allow localhost origins in development
+    if settings.is_development:
+        cors_origins.extend([
+            "http://localhost:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:5174",
+            "http://localhost:8000",
+        ])
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-    expose_headers=["X-Response-Time-Ms"],
+    # SECURITY: Explicit allow-list instead of "*" to prevent header injection
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Origin",
+        "X-Requested-With",
+    ],
+    expose_headers=["X-Response-Time-Ms", "X-RateLimit-Remaining", "X-RateLimit-Limit"],
 )
 
 
@@ -233,12 +241,14 @@ async def global_exception_handler(request: Request, exc: Exception):
     """Handle all unhandled exceptions."""
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
     
+    # SECURITY: Never leak exception details in production, even if debug=True
+    show_details = settings.debug and settings.is_development
     return JSONResponse(
         status_code=500,
         content={
             "error": "internal_server_error",
             "message": "An unexpected error occurred. Please try again.",
-            "details": str(exc) if settings.debug else None
+            "details": str(exc) if show_details else None
         }
     )
 
@@ -268,11 +278,10 @@ async def root():
     """
     Root endpoint with API information.
     """
-    return {
+    response = {
         "name": settings.app_name,
         "version": settings.app_version,
         "description": "Indian Law RAG Chatbot API",
-        "documentation": "/docs",
         "health": "/health",
         "endpoints": {
             "chat": "/api/v1/chat",
@@ -284,3 +293,8 @@ async def root():
             "admin": "/api/v1/admin"
         }
     }
+    
+    if settings.is_development:
+        response["documentation"] = "/docs"
+        
+    return response

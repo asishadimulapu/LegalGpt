@@ -90,7 +90,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             # - 'unsafe-inline' for style-src is often needed for CSS-in-JS frameworks
             # - 'unsafe-eval' is intentionally EXCLUDED (security risk)
             # - Nonce is provided for inline scripts that need it
-            # 
+            # - object-src 'none' blocks Flash/Java plugins (XSS vector)
+            # - base-uri 'self' prevents base tag injections
+            #
             # TODO: If you need stricter CSP:
             # 1. Remove 'unsafe-inline' from style-src
             # 2. Use nonce-{nonce} for all inline scripts/styles
@@ -102,7 +104,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 f"img-src 'self' data: https:; "
                 f"font-src 'self' data:; "
                 f"connect-src {connect_src}; "
-                f"frame-ancestors 'none';"
+                f"object-src 'none'; "  # Block plugin-based attacks
+                f"base-uri 'self'; "   # Prevent base tag injection
+                f"form-action 'self'; "
+                f"frame-ancestors 'none'; "
+                f"upgrade-insecure-requests;"
             )
         
         # Prevent MIME sniffing
@@ -111,8 +117,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Prevent clickjacking
         response.headers["X-Frame-Options"] = "DENY"
         
-        # XSS protection (legacy, but doesn't hurt)
-        response.headers["X-XSS-Protection"] = "1; mode=block"
+        # NOTE: X-XSS-Protection intentionally omitted — it is deprecated,
+        # can cause information leaks in older browsers, and CSP provides
+        # superior XSS protection.  See: https://owasp.org/www-project-secure-headers/
         
         # Referrer policy
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -128,5 +135,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # or use raw_headers access. This safely removes the header if present.
         if "server" in response.headers:
             del response.headers["server"]
+        
+        # SECURITY: Prevent caching of API responses containing sensitive data
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+            response.headers["Pragma"] = "no-cache"  # HTTP/1.0 compat
         
         return response

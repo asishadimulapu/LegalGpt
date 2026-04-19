@@ -1,5 +1,5 @@
 /**
- * NyayaSahay Mobile - Disclaimer Screen
+ * LawGPT Mobile - Disclaimer Screen
  */
 
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
@@ -14,12 +14,12 @@ const DISCLAIMERS = [
     {
         icon: "alert-circle",
         title: "Not Legal Advice",
-        content: "NyayaSahay provides legal information for educational purposes only. This is NOT legal advice and should not be treated as such. Always consult a qualified advocate for specific legal matters."
+        content: "LawGPT provides legal information for educational purposes only. This is NOT legal advice and should not be treated as such. Always consult a qualified advocate for specific legal matters."
     },
     {
         icon: "users",
         title: "No Attorney-Client Relationship",
-        content: "Using NyayaSahay does not create an attorney-client relationship. The information provided is general in nature and may not apply to your specific situation."
+        content: "Using LawGPT does not create an attorney-client relationship. The information provided is general in nature and may not apply to your specific situation."
     },
     {
         icon: "clock",
@@ -29,7 +29,7 @@ const DISCLAIMERS = [
     {
         icon: "map-pin",
         title: "Jurisdiction Limitations",
-        content: "NyayaSahay focuses on Indian law. Laws vary by state and jurisdiction. Local laws and procedures may differ from general information provided."
+        content: "LawGPT focuses on Indian law. Laws vary by state and jurisdiction. Local laws and procedures may differ from general information provided."
     },
     {
         icon: "cpu",
@@ -39,7 +39,7 @@ const DISCLAIMERS = [
     {
         icon: "shield-off",
         title: "No Liability",
-        content: "NyayaSahay and its operators are not liable for any actions taken based on information provided. Use this service at your own discretion and risk."
+        content: "LawGPT and its operators are not liable for any actions taken based on information provided. Use this service at your own discretion and risk."
     },
 ];
 
@@ -76,7 +76,7 @@ export default function DisclaimerScreen() {
                     </View>
                     <Text style={styles.heroTitle}>Important Disclaimer</Text>
                     <Text style={styles.heroSubtitle}>
-                        Please read carefully before using NyayaSahay
+                        Please read carefully before using LawGPT
                     </Text>
                 </View>
 
@@ -85,7 +85,7 @@ export default function DisclaimerScreen() {
                     <Feather name="alert-triangle" size={32} color={COLORS.errorRed} />
                     <Text style={styles.mainWarningTitle}>Legal Information Only</Text>
                     <Text style={styles.mainWarningText}>
-                        NyayaSahay is an AI-powered legal information service. It is NOT a substitute 
+                        LawGPT is an AI-powered legal information service. It is NOT a substitute 
                         for professional legal advice from a qualified advocate.
                     </Text>
                 </View>
@@ -106,7 +106,7 @@ export default function DisclaimerScreen() {
                 {/* Acknowledgment */}
                 <View style={styles.acknowledgment}>
                     <Text style={styles.acknowledgmentText}>
-                        By using NyayaSahay, you acknowledge that you have read, understood, 
+                        By using LawGPT, you acknowledge that you have read, understood, 
                         and agree to this disclaimer.
                     </Text>
                 </View>

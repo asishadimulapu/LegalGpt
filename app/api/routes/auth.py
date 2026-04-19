@@ -164,6 +164,67 @@ async def _verify_and_consume_oauth_state(state: str) -> bool:
     return False
 
 
+# ── Account lockout helpers ───────────────────────────────────────────────
+# Uses Redis when available; falls back to in-memory dict with TTL.
+
+_login_fail_counts: dict[str, dict] = {}  # fallback: {key: {"count": int, "expires_at": datetime}}
+_login_fail_lock = asyncio.Lock()
+
+
+async def _get_fail_count(key: str) -> int:
+    """Return the current failed-login count for a key."""
+    from app.utils.redis_client import get_redis
+
+    redis = await get_redis()
+    if redis:
+        val = await redis.get(key)
+        return int(val) if val else 0
+
+    async with _login_fail_lock:
+        entry = _login_fail_counts.get(key)
+        if entry and datetime.now(timezone.utc) < entry["expires_at"]:
+            return entry["count"]
+        # Expired or missing
+        _login_fail_counts.pop(key, None)
+        return 0
+
+
+async def _increment_fail_count(key: str, ttl_seconds: int = 900) -> int:
+    """Increment the failed-login counter and return the new value."""
+    from app.utils.redis_client import get_redis
+
+    redis = await get_redis()
+    if redis:
+        pipe = redis.pipeline()
+        pipe.incr(key)
+        pipe.expire(key, ttl_seconds)
+        results = await pipe.execute()
+        return int(results[0])
+
+    async with _login_fail_lock:
+        entry = _login_fail_counts.get(key)
+        now = datetime.now(timezone.utc)
+        if entry and now < entry["expires_at"]:
+            entry["count"] += 1
+        else:
+            entry = {"count": 1, "expires_at": now + timedelta(seconds=ttl_seconds)}
+            _login_fail_counts[key] = entry
+        return entry["count"]
+
+
+async def _reset_fail_count(key: str) -> None:
+    """Clear the failed-login counter on successful login."""
+    from app.utils.redis_client import get_redis
+
+    redis = await get_redis()
+    if redis:
+        await redis.delete(key)
+        return
+
+    async with _login_fail_lock:
+        _login_fail_counts.pop(key, None)
+
+
 # Fallback audit log directory
 _FALLBACK_AUDIT_DIR = Path("logs/fallback_audit")
 _FALLBACK_AUDIT_DIR.mkdir(parents=True, exist_ok=True)
@@ -385,18 +446,55 @@ async def login(
     Authenticate user and return JWT token.
     Sets an HttpOnly cookie for web clients and returns the token in the
     response body for mobile / programmatic clients.
+    
+    SECURITY: Implements account lockout after repeated failed attempts.
     """
     from fastapi.responses import JSONResponse
     from app.utils.cookies import set_auth_cookie
+    from app.config import settings
+    
+    client_ip = get_client_ip(request)
+    
+    # ── Account lockout check ────────────────────────────────────────
+    lockout_key = f"login_fail:{credentials.email}"
+    fail_count = await _get_fail_count(lockout_key)
+    if fail_count >= settings.account_lockout_threshold:
+        logger.warning(
+            f"Account locked: {credentials.email} "
+            f"({fail_count} failed attempts) from IP {client_ip}"
+        )
+        AuditLogger.log_event(
+            db=db,
+            event_type="account_locked_login_attempt",
+            event_category="authentication",
+            severity="warning",
+            ip_address=client_ip,
+            user_agent=request.headers.get("User-Agent"),
+            details={"email": credentials.email, "fail_count": fail_count},
+            success=False,
+            force_commit=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Account temporarily locked due to too many failed attempts. "
+                   f"Please try again in {settings.account_lockout_duration_minutes} minutes.",
+            headers={"Retry-After": str(settings.account_lockout_duration_minutes * 60)},
+        )
+    
     # Authenticate user
     user = UserCRUD.authenticate(db, credentials.email, credentials.password)
     
     if not user:
+        # Increment fail counter
+        await _increment_fail_count(
+            lockout_key,
+            ttl_seconds=settings.account_lockout_duration_minutes * 60,
+        )
         # Log failed authentication
         AuditLogger.log_failed_authentication(
             db=db,
             email=credentials.email,
-            ip_address=get_client_ip(request),
+            ip_address=client_ip,
             user_agent=request.headers.get("User-Agent"),
             reason="invalid_credentials"
         )
@@ -430,11 +528,14 @@ async def login(
             detail="Please verify your email before signing in. Check your inbox for the verification link.",
         )
     
+    # ── Reset lockout counter on successful login ──
+    await _reset_fail_count(lockout_key)
+    
     # Log successful login
     AuditLogger.log_login(
         db=db,
         user_id=user.id,
-        ip_address=get_client_ip(request),
+        ip_address=client_ip,
         user_agent=request.headers.get("User-Agent"),
         success=True
     )

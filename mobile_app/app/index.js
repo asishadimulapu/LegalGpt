@@ -1,5 +1,5 @@
 /**
- * NyayaSahay Mobile - Landing Screen
+ * LawGPT Mobile - Landing Screen
  * Professional swipeable pages layout with responsive design
  */
 
@@ -28,7 +28,24 @@ import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
 import { wp, hp, ms, screenSize } from '../constants/responsive';
 import { getUser } from '../services/api';
 
-const ONBOARDING_SEEN_KEY = 'nyayasahay_onboarding_seen';
+const ONBOARDING_SEEN_KEY = 'lawgpt_onboarding_seen';
+const OLD_ONBOARDING_KEYS = ['nyayasahay_onboarding_seen', 'LawGPT_onboarding_seen'];
+
+// Migrate old onboarding keys to new one (runs once)
+async function migrateOnboardingKey() {
+    try {
+        const newVal = await AsyncStorage.getItem(ONBOARDING_SEEN_KEY);
+        if (newVal) return; // Already migrated
+        for (const oldKey of OLD_ONBOARDING_KEYS) {
+            const oldVal = await AsyncStorage.getItem(oldKey);
+            if (oldVal) {
+                await AsyncStorage.setItem(ONBOARDING_SEEN_KEY, oldVal);
+                await AsyncStorage.removeItem(oldKey);
+                return;
+            }
+        }
+    } catch (_e) { /* best-effort */ }
+}
 
 // Page data
 
@@ -115,6 +132,7 @@ export default function LandingScreen() {
         let mounted = true;
         (async () => {
             try {
+                await migrateOnboardingKey();
                 const user = await getUser();
                 if (user && mounted) {
                     // Already logged in — go straight to chat
@@ -324,7 +342,7 @@ export default function LandingScreen() {
                 <View style={styles.loadingLogo}>
                     <MaterialCommunityIcons name="scale-balance" size={48} color={COLORS.primary} />
                 </View>
-                <Text style={styles.loadingTitle}>NyayaSahay</Text>
+                <Text style={styles.loadingTitle}>LawGPT</Text>
                 <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: SPACING.lg }} />
             </View>
         );

@@ -7,7 +7,7 @@
  *  3. IPC Sections reference with search
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Shield,
@@ -25,6 +25,7 @@ import {
   Home,
   Globe,
 } from 'lucide-react';
+import { LegalPageSkeleton } from '../components/SkeletonLoader';
 import '../styles/rights.css';
 
 /* ── Data ──────────────────────────────────────────── */
@@ -138,6 +139,14 @@ const IPC_SECTIONS = [
 function Rights() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('rights');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const t = setTimeout(() => setIsLoading(false), 400);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (isLoading) return <LegalPageSkeleton />;
 
   const filteredIPC = IPC_SECTIONS.filter(
     (s) =>

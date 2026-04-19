@@ -12,6 +12,10 @@ on:
   pull_request:
     branches: [main]
 
+# SECURITY: Restrict default permissions (principle of least privilege)
+permissions:
+  contents: read
+
 env:
   PYTHON_VERSION: "3.10"
   NODE_VERSION: "18"
@@ -97,23 +101,39 @@ jobs:
           du -sh dist/
 
   # ---------------------------------------------------------------------------
-  # Security Check
+  # Security Scanning (Enhanced)
   # ---------------------------------------------------------------------------
   security-check:
     name: Security Scan
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: "sqlite:///./test.db"
+      JWT_SECRET_KEY: "ci-test-secret-key-not-real"
+      ENCRYPTION_KEY: "ci-test-encryption-key-1234567890abcdef"
+      GROQ_API_KEY: "ci-test-groq-key"
+      ENVIRONMENT: "testing"
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # ── Secrets Detection ──────────────────────────────────────────
       - name: Check for secrets in code
         run: |
-          # Check for common secret patterns (fail if found)
           echo "Scanning for exposed secrets..."
-          ! grep -rn "GOCSPX-\|gsk_\|sk-\|AKIA" --include="*.py" --include="*.js" --include="*.jsx" \
-            --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=venv \
-            app/ frontend/src/ || echo "⚠ Potential secrets found - review above"
+          ! grep -rn "GOCSPX-\|gsk_\|sk-\|AKIA\|ghp_\|glpat-" --include="*.py" --include="*.js" --include="*.jsx" --include="*.ts" --include="*.tsx" \
+            --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=venv --exclude-dir=__pycache__ \
+            app/ frontend/src/ || { echo "❌ Potential secrets found!"; exit 1; }
 
       - name: Check .env not committed
         run: |
@@ -123,3 +143,19 @@ jobs:
           else
             echo "✓ .env not in repository"
           fi
+
+      # ── Python Dependency Audit ────────────────────────────────────
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run pip-audit (Python CVE scan)
+        run: |
+          pip install -r requirements.txt
+          pip-audit --strict --desc 2>&1 || echo "⚠ pip-audit found vulnerabilities — review above"
+
+      # ── Frontend Dependency Audit ──────────────────────────────────
+      - name: Run npm audit (Frontend CVE scan)
+        working-directory: frontend
+        run: |
+          npm ci
+          npm audit --audit-level=high 2>&1 || echo "⚠ npm audit found vulnerabilities — review above"

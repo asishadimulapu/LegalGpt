@@ -7,7 +7,8 @@ and DPDPA/GDPR-compliant privacy controls.
 from typing import Optional, List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from app.middleware import rate_limit
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
@@ -78,7 +79,9 @@ class StatsResponse(BaseModel):
 # =============================================================================
 
 @router.get("", response_model=ProfileResponse)
+@rate_limit(requests_per_minute=60)
 async def get_profile(
+    request: Request,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -117,7 +120,9 @@ async def get_profile(
 
 
 @router.put("", response_model=ProfileResponse)
+@rate_limit(requests_per_minute=20)
 async def update_profile(
+    request: Request,
     body: ProfileUpdateRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -148,7 +153,9 @@ async def update_profile(
 # =============================================================================
 
 @router.get("/stats", response_model=StatsResponse)
+@rate_limit(requests_per_minute=60)
 async def get_stats(
+    request: Request,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -196,7 +203,9 @@ async def get_stats(
 # =============================================================================
 
 @router.get("/memories", response_model=List[MemoryItem])
+@rate_limit(requests_per_minute=60)
 async def get_memories(
+    request: Request,
     memory_type: Optional[str] = None,
     limit: int = 20,
     user: User = Depends(get_current_user),
@@ -219,7 +228,9 @@ async def get_memories(
 
 
 @router.delete("/memories")
+@rate_limit(requests_per_minute=10)
 async def clear_memories(
+    request: Request,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -233,7 +244,9 @@ async def clear_memories(
 # =============================================================================
 
 @router.get("/export")
+@rate_limit(requests_per_minute=10)
 async def export_data(
+    request: Request,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -252,7 +265,9 @@ class DeleteAccountRequest(BaseModel):
 
 
 @router.delete("/delete-account")
+@rate_limit(requests_per_minute=5)
 async def delete_account(
+    request: Request,
     body: DeleteAccountRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

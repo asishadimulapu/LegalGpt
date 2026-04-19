@@ -1,5 +1,5 @@
 /**
- * NyayaSahay Mobile - Design System Colors
+ * LawGPT Mobile - Design System Colors
  * Pixel-perfect replica of web CSS variables
  */
 

@@ -1,5 +1,5 @@
 /**
- * NyayaSahay Mobile - FAQ Screen
+ * LawGPT Mobile - FAQ Screen
  * Frequently Asked Questions
  */
 
@@ -14,15 +14,15 @@ import { COLORS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
 
 const FAQ_DATA = [
     {
-        q: "What is NyayaSahay?",
-        a: "NyayaSahay is an AI-powered legal assistant that provides information about Indian law, including IPC (Indian Penal Code), CrPC (Code of Criminal Procedure), and Constitutional provisions."
+        q: "What is LawGPT?",
+        a: "LawGPT is an AI-powered legal assistant that provides information about Indian law, including IPC (Indian Penal Code), CrPC (Code of Criminal Procedure), and Constitutional provisions."
     },
     {
         q: "Is this legal advice?",
-        a: "No. NyayaSahay provides legal information only, not legal advice. For specific legal matters, please consult a qualified advocate."
+        a: "No. LawGPT provides legal information only, not legal advice. For specific legal matters, please consult a qualified advocate."
     },
     {
-        q: "What laws does NyayaSahay cover?",
+        q: "What laws does LawGPT cover?",
         a: "We cover IPC (Indian Penal Code), CrPC (Code of Criminal Procedure), Constitution of India, IT Act, and various other Indian legal provisions."
     },
     {
@@ -35,15 +35,15 @@ const FAQ_DATA = [
     },
     {
         q: "Do I need to create an account?",
-        a: "No. You can use NyayaSahay without an account. However, creating an account allows you to save your chat history."
+        a: "No. You can use LawGPT without an account. However, creating an account allows you to save your chat history."
     },
     {
         q: "What if I get incorrect information?",
         a: "Always verify important legal information with a qualified lawyer. While we strive for accuracy, AI systems can make mistakes."
     },
     {
-        q: "Is NyayaSahay free to use?",
-        a: "Yes, NyayaSahay is currently free to use for basic legal queries. Premium features may be added in the future."
+        q: "Is LawGPT free to use?",
+        a: "Yes, LawGPT is currently free to use for basic legal queries. Premium features may be added in the future."
     },
 ];
 
@@ -99,7 +99,7 @@ export default function FAQScreen() {
                     </View>
                     <Text style={styles.heroTitle}>Frequently Asked Questions</Text>
                     <Text style={styles.heroSubtitle}>
-                        Find answers to common questions about NyayaSahay
+                        Find answers to common questions about LawGPT
                     </Text>
                 </View>
 
@@ -120,7 +120,7 @@ export default function FAQScreen() {
                 <View style={styles.contactCta}>
                     <Feather name="message-circle" size={24} color={COLORS.primary} />
                     <Text style={styles.contactText}>
-                        Still have questions? Contact us at support@nyayasahay.app
+                        Still have questions? Contact us at support@LawGPT.app
                     </Text>
                 </View>
             </ScrollView>
