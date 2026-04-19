@@ -110,6 +110,7 @@ function ProfileDashboard() {
   /* ── Data Fetch ───────────────────────────────── */
   const fetchAll = useCallback(async () => {
     setLoading(true);
+    const minDelay = new Promise(r => setTimeout(r, 1200));
     try {
       const [profileRes, statsRes, memoriesRes] = await Promise.allSettled([
         getUserProfile(),
@@ -137,6 +138,7 @@ function ProfileDashboard() {
     } catch {
       showToast('Failed to load profile data', 'error');
     } finally {
+      await minDelay;
       setLoading(false);
     }
   }, []);

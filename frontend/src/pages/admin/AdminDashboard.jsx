@@ -13,12 +13,14 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         async function load() {
+            const minDelay = new Promise(r => setTimeout(r, 1200));
             try {
                 const s = await getDashboardStats();
                 setStats(s);
             } catch (err) {
                 setError(err.message);
             } finally {
+                await minDelay;
                 setLoading(false);
             }
         }

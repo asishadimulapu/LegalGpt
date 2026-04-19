@@ -15,7 +15,7 @@ function FAQ() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const t = setTimeout(() => setIsLoading(false), 400);
+        const t = setTimeout(() => setIsLoading(false), 1200);
         return () => clearTimeout(t);
     }, []);
 

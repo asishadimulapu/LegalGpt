@@ -14,12 +14,14 @@ export default function AuditLogs() {
 
     const fetchLogs = useCallback(async (page = 1) => {
         setLoading(true);
+        const minDelay = new Promise(r => setTimeout(r, 1200));
         try {
             const res = await getAuditLogs(page, 20, eventType, severity);
             setData(res);
         } catch (err) {
             setError(err.message);
         } finally {
+            await minDelay;
             setLoading(false);
         }
     }, [eventType, severity]);

@@ -16,6 +16,7 @@ export default function QueryAnalytics() {
     useEffect(() => {
         async function load() {
             setLoading(true);
+            const minDelay = new Promise(r => setTimeout(r, 1200));
             try {
                 const [a, l] = await Promise.all([
                     getQueryAnalytics(days),
@@ -26,6 +27,7 @@ export default function QueryAnalytics() {
             } catch (err) {
                 setError(err.message);
             } finally {
+                await minDelay;
                 setLoading(false);
             }
         }

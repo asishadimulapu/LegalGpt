@@ -44,7 +44,7 @@ function Landing() {
         const t = setTimeout(() => {
             setIsLoading(false);
             setIsVisible(true);
-        }, 400);
+        }, 1200);
         return () => clearTimeout(t);
     }, []);
 

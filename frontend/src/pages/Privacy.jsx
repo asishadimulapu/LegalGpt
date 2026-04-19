@@ -11,7 +11,7 @@ import '../styles/legal.css';
 
 function Privacy() {
     const [isLoading, setIsLoading] = useState(true);
-    useEffect(() => { const t = setTimeout(() => setIsLoading(false), 350); return () => clearTimeout(t); }, []);
+    useEffect(() => { const t = setTimeout(() => setIsLoading(false), 1200); return () => clearTimeout(t); }, []);
     if (isLoading) return <LegalPageSkeleton />;
     return (
         <div className="legal-page">

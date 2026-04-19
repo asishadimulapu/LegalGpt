@@ -24,7 +24,7 @@ function Contact() {
 
     // Skeleton + cleanup timeout on unmount
     useEffect(() => {
-        const skTimer = setTimeout(() => setIsLoading(false), 400);
+        const skTimer = setTimeout(() => setIsLoading(false), 1200);
         return () => {
             clearTimeout(skTimer);
             if (submitTimeoutRef.current) {

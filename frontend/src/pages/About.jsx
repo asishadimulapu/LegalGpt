@@ -35,7 +35,7 @@ function About() {
     const { isAuthenticated } = useAuth();
 
     useEffect(() => {
-        const t = setTimeout(() => { setIsLoading(false); setIsVisible(true); }, 400);
+        const t = setTimeout(() => { setIsLoading(false); setIsVisible(true); }, 1200);
         return () => clearTimeout(t);
     }, []);
 

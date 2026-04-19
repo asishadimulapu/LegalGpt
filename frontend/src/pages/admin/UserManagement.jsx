@@ -20,6 +20,7 @@ export default function UserManagement() {
 
     const fetchUsers = useCallback(async (page = 1, searchParam, providerParam) => {
         setLoading(true);
+        const minDelay = new Promise(r => setTimeout(r, 1200));
         try {
             const res = await getUsers(page, 20, searchParam ?? search, providerParam ?? provider);
             setData(res);
@@ -27,6 +28,7 @@ export default function UserManagement() {
         } catch (err) {
             setError(err.message);
         } finally {
+            await minDelay;
             setLoading(false);
         }
     }, []);

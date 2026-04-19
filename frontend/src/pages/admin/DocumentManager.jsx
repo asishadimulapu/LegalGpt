@@ -13,12 +13,14 @@ export default function DocumentManager() {
 
     const fetchDocs = useCallback(async (page = 1) => {
         setLoading(true);
+        const minDelay = new Promise(r => setTimeout(r, 1200));
         try {
             const res = await getDocuments(page, 20, search);
             setData(res);
         } catch (err) {
             setError(err.message);
         } finally {
+            await minDelay;
             setLoading(false);
         }
     }, [search]);
