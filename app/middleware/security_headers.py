@@ -130,6 +130,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "payment=(), usb=(), magnetometer=(), gyroscope=()"
         )
         
+        # Cross-Origin Resource Policy (prevent cross-origin embedding)
+        response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+        
         # Remove server header (don't advertise technology)
         # Note: MutableHeaders doesn't have pop(), use 'del' with key check
         # or use raw_headers access. This safely removes the header if present.
