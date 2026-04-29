@@ -73,9 +73,10 @@ tmp/
 temp/
 *.tmp
 
-# VS Code extensions
+# VS Code extensions / AI tools
 .kluster/
-.agent/
+.agents/
+.gemini/
 
 # Generated data (rebuild with scripts)
 data/faiss_index/
