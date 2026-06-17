@@ -6,7 +6,7 @@
 # ---------------------------------------------------------------------------
 # Stage 1: Builder — install Python dependencies into a virtual env
 # ---------------------------------------------------------------------------
-FROM python:3.10-slim AS builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /build
 
@@ -28,7 +28,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # ---------------------------------------------------------------------------
 # Stage 2: Production — lean runtime image
 # ---------------------------------------------------------------------------
-FROM python:3.10-slim AS production
+FROM python:3.14-slim AS production
 
 # Runtime-only native libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
